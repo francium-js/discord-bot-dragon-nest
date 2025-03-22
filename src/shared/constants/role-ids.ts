@@ -1,7 +1,7 @@
 import { NestEnum } from 'src/shared/enums/nests'
 import { ServerRegionEnum } from '../enums/server-region'
 
-export const roleIdsMap = {
+export const roleIdsMap: Record<NestEnum | ServerRegionEnum, string> = {
   [NestEnum.VN]: '1351930079143526540',
   [NestEnum.TCN]: '1351930118431572161',
   [NestEnum.VON]: '1351929988378525696',

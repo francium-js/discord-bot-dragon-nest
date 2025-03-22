@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config'
 import { nestInfoMap } from 'src/shared/constants/nest-info-map'
 import { NestEnum } from 'src/shared/enums/nests'
 import { roleIdsMap } from 'src/shared/constants/role-ids'
+import { ServerRegionEnum } from 'src/shared/enums/server-region'
 
 @Injectable()
 class KarahanManagerService implements OnModuleInit {
@@ -95,16 +96,16 @@ class KarahanManagerService implements OnModuleInit {
     if (!member) return
 
     const roleName = this.regionServersRoles[emoji.name] || emoji.name
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const roleId = roleIdsMap[roleName]
+
+    const roleId = roleIdsMap[roleName as NestEnum | ServerRegionEnum]
 
     if (!roleId) return
 
-    const role = message.guild?.roles.cache.get(roleId as string)
+    const role = message.guild?.roles.cache.get(roleId)
 
     if (!role) return
 
-    const hasRole = member.roles.cache.has(roleId as string)
+    const hasRole = member.roles.cache.has(roleId)
 
     const userReactions = await message.reactions
       .resolve(emoji.id || emoji.name)
