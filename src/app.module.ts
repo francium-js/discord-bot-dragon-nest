@@ -1,25 +1,26 @@
 import { Module } from '@nestjs/common'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ConfigModule } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { AppConfig, DatabaseConfig } from './config'
 import { RedisModule } from './shared/redis/redis.module'
 import { RubinartManagerModule } from './modules/rubinart-manager/rubinart-manager.module'
 import { AishaManagerModule } from './modules/aisha-manager/aisha-manager.module'
+import { configSchema } from './config.schema'
+import { dataSourceOptions } from './ormconfig'
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      cache: true,
-      load: [AppConfig, DatabaseConfig],
+      validationSchema: configSchema,
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: true,
+      },
     }),
     RedisModule,
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        ...configService.get('database'),
-      }),
-      inject: [ConfigService],
+    TypeOrmModule.forRoot({
+      ...dataSourceOptions,
+      migrations: [],
     }),
     AishaManagerModule,
     RubinartManagerModule,

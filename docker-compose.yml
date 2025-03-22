@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:latest
-    container_name: postgres-container
+    container_name: dragon-nest-db
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
@@ -16,7 +16,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./dump.sql:/docker-entrypoint-initdb.d/dump.sql
     networks:
-      - app-network
+      - nest_network
 
   redis:
     image: redis:latest
@@ -25,14 +25,14 @@ services:
     ports:
       - '${REDIS_PORT}:6379'
     volumes:
-      - redis_data:/data
+      - redis-data:/data
     networks:
       - nest_network
     command: ['redis-server', '--appendonly', 'yes']
 
 volumes:
-  postgres_data:
-  redis_data:
+  postgres-data:
+  redis-data:
 
 networks:
   nest_network:
