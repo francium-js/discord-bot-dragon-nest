@@ -4,9 +4,11 @@ import {
   Column,
   OneToMany,
   ManyToOne,
+  OneToOne,
 } from 'typeorm'
 import { CharacterEntity } from './character.entity'
 import { PartyEntity } from './partys.entity'
+import { CharListMessageEntity } from './char-list-message.entity'
 
 @Entity({ name: 'users' })
 export class UserEntity {
@@ -27,4 +29,10 @@ export class UserEntity {
     onDelete: 'SET NULL',
   })
   joinedParty: PartyEntity
+
+  @OneToOne(
+    () => CharListMessageEntity,
+    charListMessageEntity => charListMessageEntity.user,
+  )
+  charListMessage: CharListMessageEntity
 }

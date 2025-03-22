@@ -54,7 +54,7 @@ class CharacterAddService {
       ? `<:${userData.class}:${classesEmojiMap[userData.class]}>`
       : ''
 
-    const newCharacterEmbed = new EmbedBuilder().setColor(0xe4c547).addFields([
+    const newCharacterEmbed = new EmbedBuilder().setColor(0xdbc907).addFields([
       {
         name: '',
         value: `${classText} **${userData.nickname}** ${elementsText}`,

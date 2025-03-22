@@ -4,7 +4,7 @@ import { RareHexEnum } from 'src/shared/enums/rare-color'
 
 export const nestInfoMap = {
   [NestEnum.VN]: {
-    emoji: '1352121601956515861',
+    emoji: '1353035459831398581',
     name: 'Volcano Nest',
     description: '',
     imgUrl: pheonix,
@@ -59,22 +59,22 @@ export const nestInfoMap = {
     imgUrl: rdn,
     color: RareHexEnum.UNIQUE,
   },
-  [NestEnum.BDNHC]: {
-    emoji: '1352119134888136796',
+  [NestEnum.BDN_HC]: {
+    emoji: '1353028827647049781',
     name: 'Black Dragon Nest',
     description: '',
     imgUrl: bdn,
     color: RareHexEnum.LEGEND,
   },
-  [NestEnum.DDNHC]: {
-    emoji: '1352119134888136796',
+  [NestEnum.DDN_HC]: {
+    emoji: '1353028825428005036',
     name: 'Desert Dragon Nest',
     description: '',
     imgUrl: ddn,
     color: RareHexEnum.LEGEND,
   },
-  [NestEnum.RDNHC]: {
-    emoji: '1352119134888136796',
+  [NestEnum.RDN_HC]: {
+    emoji: '1353028822487793734',
     name: 'Red Dragon Nest',
     description: '',
     imgUrl: rdn,

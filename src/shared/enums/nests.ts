@@ -7,7 +7,7 @@ export enum NestEnum {
   BDN = 'BDN',
   DDN = 'DDN',
   RDN = 'RDN',
-  BDNHC = 'BDNHC',
-  DDNHC = 'DDNHC',
-  RDNHC = 'RDNHC',
+  BDN_HC = 'BDN_HC',
+  DDN_HC = 'DDN_HC',
+  RDN_HC = 'RDN_HC',
 }

@@ -9,17 +9,17 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:dev": "ts-node -r tsconfig-paths/register src/main.ts --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint:format": "prettier --write ./src --log-level silent",
     "lint:fix": "eslint --fix --cache ./src --max-warnings=0 --color",
     "lint:pre-commit": "lint-staged",
     "db:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d ./typeorm.config.ts src/migrations/init",
-    "db:up": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/data-source.ts",
-    "db:down": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d ./src/data-source.ts",
-    "db:sync": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js schema:sync -d ./src/data-source.ts",
-    "db:log": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js schema:log -d ./src/data-source.ts"
+    "db:up": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/config/data-source.ts",
+    "db:down": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d ./src/config/data-source.ts",
+    "db:sync": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js schema:sync -d ./src/config/data-source.ts",
+    "db:log": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js schema:log -d ./src/config/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

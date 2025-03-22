@@ -5,13 +5,21 @@ import * as dotenv from 'dotenv'
 
 dotenv.config()
 
+const {
+  POSTGRES_PORT,
+  POSTGRES_HOST,
+  POSTGRES_DB,
+  POSTGRES_USER,
+  POSTGRES_PASSWORD,
+} = process.env
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.POSTGRES_HOST,
-  port: parseInt(process.env.POSTGRES_PORT, 10),
-  username: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD,
-  database: process.env.POSTGRES_DB,
+  host: POSTGRES_HOST,
+  port: parseInt(POSTGRES_PORT, 10),
+  username: POSTGRES_USER,
+  password: POSTGRES_PASSWORD,
+  database: POSTGRES_DB,
   synchronize: false,
   migrationsRun: false,
   migrationsTableName: 'migrations_typeorm',

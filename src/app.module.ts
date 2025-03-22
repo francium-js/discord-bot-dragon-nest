@@ -7,6 +7,8 @@ import { AishaManagerModule } from './modules/aisha-manager/aisha-manager.module
 import { configSchema } from './config/config.schema'
 import appConfig from './config/app.config'
 import { AppDataSource } from './config/data-source'
+import { KarahanManagerModule } from './modules/karahan-manager/karahan-manager.module'
+import { ArgentaManagerModule } from './modules/argenta-manager/argenta-manager.module'
 
 @Module({
   imports: [
@@ -22,8 +24,10 @@ import { AppDataSource } from './config/data-source'
     }),
     TypeOrmModule.forRoot(AppDataSource.options),
     RedisModule,
+    ArgentaManagerModule,
     AishaManagerModule,
     RubinartManagerModule,
+    KarahanManagerModule,
   ],
 })
 export class AppModule {}

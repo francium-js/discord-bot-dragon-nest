@@ -19,6 +19,15 @@ const PARAMS = {
   // redis
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().default(6380),
+
+  // discord bot tokens
+  RUBINART_DISCORD_TOKEN: Joi.string().required(),
+  AISHA_DISCORD_TOKEN: Joi.string().required(),
+
+  // discord channel ids
+  PARTY_MANAGER_CHANNEL_ID: Joi.string().required(),
+  CHARS_MANAGER_CHANNEL_ID: Joi.string().required(),
+  ROLES_MANAGER_CHANNEL_ID: Joi.string().required(),
 }
 
 export const configSchema = Joi.object<typeof PARAMS>(PARAMS)
