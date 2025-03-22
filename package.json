@@ -15,14 +15,11 @@
     "lint:format": "prettier --write ./src --log-level silent",
     "lint:fix": "eslint --fix --cache ./src --max-warnings=0 --color",
     "lint:pre-commit": "lint-staged",
-    "db:sync": "yarn typeorm schema:sync -d ./src/ormconfig.ts",
-    "db:log": "yarn typeorm schema:log -d ./src/ormconfig.ts",
-    "db:create": "yarn typeorm migration:create",
-    "db:up": "yarn typeorm migration:run -d ./src/ormconfig.ts",
-    "db:down": "yarn typeorm migration:revert -d ./src/ormconfig.ts",
-    "db:check": "yarn typeorm migration:generate --check true -d ./src/ormconfig.ts fake-filename",
-    "db:generate": "yarn typeorm migration:generate -p true -d ./src/ormconfig.ts",
-    "db:generate:init": "yarn db:generate -t 1657785979107 ./migrations/init"
+    "db:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d ./typeorm.config.ts src/migrations/init",
+    "db:up": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d ./src/data-source.ts",
+    "db:down": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d ./src/data-source.ts",
+    "db:sync": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js schema:sync -d ./src/data-source.ts",
+    "db:log": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js schema:log -d ./src/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

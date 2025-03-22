@@ -1,5 +1,5 @@
 import * as Joi from 'joi'
-import { ENV_ENUM } from './shared/enums/env'
+import { ENV_ENUM } from '../shared/enums/env'
 
 const PARAMS = {
   // general
@@ -18,7 +18,7 @@ const PARAMS = {
 
   // redis
   REDIS_HOST: Joi.string().required(),
-  REDIS_PORT: Joi.number().default(6379),
+  REDIS_PORT: Joi.number().default(6380),
 }
 
 export const configSchema = Joi.object<typeof PARAMS>(PARAMS)

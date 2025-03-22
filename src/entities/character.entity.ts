@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm'
 import { UserEntity } from './user.entity'
-import { CharacterClassEnum } from 'src/shared/enums/character-class'
-import { ElementEnum } from 'src/shared/enums/element'
+import { CharacterClassEnum } from '../shared/enums/character-class'
+import { ElementEnum } from '../shared/enums/element'
 
 @Entity({ name: 'characters' })
 export class CharacterEntity {

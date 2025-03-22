@@ -6,8 +6,8 @@ import {
   OneToMany,
 } from 'typeorm'
 import { UserEntity } from './user.entity'
-import { ElementEnum } from 'src/shared/enums/element'
-import { ServerRegionEnum } from 'src/shared/enums/server-region'
+import { ElementEnum } from '../shared/enums/element'
+import { ServerRegionEnum } from '../shared/enums/server-region'
 
 @Entity({ name: 'partys' })
 export class PartyEntity {

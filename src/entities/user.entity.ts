@@ -5,7 +5,7 @@ import {
   OneToMany,
   ManyToOne,
 } from 'typeorm'
-import { CharacterEntity } from './character.enity'
+import { CharacterEntity } from './character.entity'
 import { PartyEntity } from './partys.entity'
 
 @Entity({ name: 'users' })
