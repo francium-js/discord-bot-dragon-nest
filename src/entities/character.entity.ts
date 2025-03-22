@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm'
 import { UserEntity } from './user.entity'
 import { CharacterClassEnum } from '../shared/enums/character-class'
 import { ElementEnum } from '../shared/enums/element'
+import { CharListEntity } from './char-list.entity'
 
 @Entity({ name: 'characters' })
 export class CharacterEntity {
@@ -31,4 +32,9 @@ export class CharacterEntity {
 
   @ManyToOne(() => UserEntity, user => user.characters, { onDelete: 'CASCADE' })
   user: UserEntity
+
+  @ManyToOne(() => CharListEntity, charList => charList.characters, {
+    onDelete: 'CASCADE',
+  })
+  charList: CharListEntity
 }

@@ -5,10 +5,11 @@ import {
   OneToMany,
   ManyToOne,
   OneToOne,
+  JoinColumn,
 } from 'typeorm'
 import { CharacterEntity } from './character.entity'
 import { PartyEntity } from './partys.entity'
-import { CharListMessageEntity } from './char-list-message.entity'
+import { CharListEntity } from './char-list.entity'
 
 @Entity({ name: 'users' })
 export class UserEntity {
@@ -31,8 +32,12 @@ export class UserEntity {
   joinedParty: PartyEntity
 
   @OneToOne(
-    () => CharListMessageEntity,
+    () => CharListEntity,
     charListMessageEntity => charListMessageEntity.user,
   )
-  charListMessage: CharListMessageEntity
+  @JoinColumn()
+  charList: CharListEntity
+
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  charlistThreadId: string
 }

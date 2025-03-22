@@ -10,17 +10,17 @@ import {
 } from 'discord.js'
 
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
-import { ConfigService } from '@nestjs/config'
 import CharactersListService from './characters-list/characters-list.service'
 import CharacterAddService from './character-add/character-add.service'
 
 @Injectable()
 class AishaManagerPanelService {
+  private charListDiscordChalledId: string = process.env.CHARS_LIST_CHANNEL_ID
+
   private client: Client
   private panelChannelId: string
 
   constructor(
-    private configService: ConfigService,
     private readonly charactersListService: CharactersListService,
     private readonly characterAddService: CharacterAddService,
   ) {
@@ -33,11 +33,11 @@ class AishaManagerPanelService {
       ],
     })
 
-    this.panelChannelId = this.configService.get<string>('CHARS_MANAGER_CHANNEL_ID')
+    this.panelChannelId = process.env.CHARS_MANAGER_CHANNEL_ID
   }
 
   async onModuleInit() {
-    const token = this.configService.get<string>('AISHA_DISCORD_TOKEN')
+    const token = process.env.AISHA_DISCORD_TOKEN
 
     if (!token) {
       return
@@ -73,6 +73,16 @@ class AishaManagerPanelService {
           return
         }
 
+        if (ComponentCustomIdEnum.SUBMIT_CHARACTER_ADD) {
+          const channel = (await this.client.channels.fetch(
+            this.charListDiscordChalledId,
+          )) as TextChannel
+
+          await this.characterAddService.submitCharacterAdd(interaction, channel)
+
+          return
+        }
+
         switch (interaction.customId) {
           case ComponentCustomIdEnum.OPEN_PANEL_CHARACTER_MANAGER:
             await this.charactersListService.createPanel(interaction)
@@ -81,9 +91,6 @@ class AishaManagerPanelService {
             await this.characterAddService.openModalInputNickNameForCreateUserCharacter(
               interaction,
             )
-            break
-          case ComponentCustomIdEnum.SUBMIT_CHARACTER_ADD:
-            await this.characterAddService.submitCharacterAdd(interaction)
             break
           case ComponentCustomIdEnum.OPEN_MODAL_INPUT_NICKNAME:
             await this.characterAddService.openModalInputNickNameForCreateUserCharacter(
@@ -98,7 +105,7 @@ class AishaManagerPanelService {
       }
     })
 
-    const channelId = this.configService.get<string>('CHARS_MANAGER_CHANNEL_ID')
+    const channelId = process.env.CHARS_MANAGER_CHANNEL_ID
     const channel = (await this.client.channels.fetch(channelId)) as TextChannel
 
     if (!channel) {

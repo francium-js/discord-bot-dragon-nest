@@ -20,6 +20,12 @@ export class PartyEntity {
   })
   createdBy: UserEntity
 
+  @ManyToOne(() => UserEntity, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  leader: UserEntity
+
   @OneToMany(() => UserEntity, user => user.joinedParty, { nullable: true })
   members: UserEntity[]
 

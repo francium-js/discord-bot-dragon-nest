@@ -8,7 +8,6 @@ import {
   ButtonStyle,
   Events,
 } from 'discord.js'
-import { ConfigService } from '@nestjs/config'
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
 import CreatePartyPanelService from './create-party-panel/create-party-panel.service'
 
@@ -17,10 +16,7 @@ class RubinartManagerService implements OnModuleInit {
   private client: Client
   private panelChannelId: string
 
-  constructor(
-    private configService: ConfigService,
-    private createPartyPanelService: CreatePartyPanelService,
-  ) {
+  constructor(private createPartyPanelService: CreatePartyPanelService) {
     this.client = new Client({
       intents: [
         GatewayIntentBits.Guilds,
@@ -30,11 +26,11 @@ class RubinartManagerService implements OnModuleInit {
       ],
     })
 
-    this.panelChannelId = this.configService.get<string>('PARTY_MANAGER_CHANNEL_ID')
+    this.panelChannelId = process.env.PARTY_MANAGER_CHANNEL_ID
   }
 
   async onModuleInit() {
-    const token = this.configService.get<string>('RUBINART_DISCORD_TOKEN')
+    const token = process.env.RUBINART_DISCORD_TOKEN
 
     if (!token) {
       return
@@ -92,7 +88,7 @@ class RubinartManagerService implements OnModuleInit {
       }
     })
 
-    const channelId = this.configService.get<string>('PARTY_MANAGER_CHANNEL_ID')
+    const channelId = process.env.PARTY_MANAGER_CHANNEL_ID
     const channel = (await this.client.channels.fetch(channelId)) as TextChannel
 
     if (!channel) {

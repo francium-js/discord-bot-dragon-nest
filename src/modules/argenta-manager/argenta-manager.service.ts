@@ -4,38 +4,70 @@ import {
   GatewayIntentBits,
   TextChannel,
   EmbedBuilder,
-  Partials,
+  Events,
+  GuildMember,
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  REST,
+  Collection,
+  Routes,
 } from 'discord.js'
 import { ConfigService } from '@nestjs/config'
+import { UserEntity } from 'src/entities/user.entity'
+import { Repository } from 'typeorm'
+import { InjectRepository } from '@nestjs/typeorm'
+import { ArgentaCommandsService } from './services/argenta-commands.service'
 
 @Injectable()
 class ArgentaManagerService implements OnModuleInit {
   private client: Client
   private panelChannelId: string
+  private commands: ArgentaCommandsService[] = []
+  private commandMap = new Collection<string, ArgentaCommandsService>()
 
-  constructor(private configService: ConfigService) {
+  public data = new SlashCommandBuilder()
+    .setName('adduser')
+    .setDescription('Add a new user to the database')
+    .addUserOption(option =>
+      option.setName('user').setDescription('User to add').setRequired(true),
+    )
+    .setDMPermission(false)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+
+  constructor(
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
+    private configService: ConfigService,
+    private argentaCommandsService: ArgentaCommandsService,
+  ) {
     this.client = new Client({
       intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessageReactions,
       ],
-      partials: [Partials.Message, Partials.Channel, Partials.Reaction],
     })
 
-    this.panelChannelId = this.configService.get<string>('GUID_MANAGER_CHANNEL_ID')
+    this.panelChannelId = process.env.GUID_MANAGER_CHANNEL_ID
   }
 
   async onModuleInit() {
-    const token = this.configService.get<string>('ARGENTA_DISCORD_TOKEN')
+    this.client.on(Events.GuildMemberAdd, async (member: GuildMember) => {
+      const newUser = this.userRepository.create({
+        discordId: member.user.id,
+      })
+
+      await this.userRepository.save(newUser)
+    })
+
+    const token = process.env.ARGENTA_DISCORD_TOKEN
 
     if (!token) return
 
     await this.client.login(token)
 
-    const channelId = this.configService.get<string>('GUID_MANAGER_CHANNEL_ID')
+    const channelId = process.env.GUID_MANAGER_CHANNEL_ID
     const channel = (await this.client.channels.fetch(channelId)) as TextChannel
 
     if (!channel) return
@@ -45,6 +77,31 @@ class ArgentaManagerService implements OnModuleInit {
     if (messages.size === 0) {
       await this.createGuidMessage()
     }
+
+    this.commands = [this.argentaCommandsService]
+
+    const rest = new REST({ version: '10' }).setToken(
+      process.env.ARGENTA_DISCORD_TOKEN,
+    )
+    const body = this.commands.map(cmd => cmd.data.toJSON())
+
+    await rest.put(Routes.applicationCommands(process.env.ARGENTA_CLIENT_ID), {
+      body,
+    })
+
+    for (const cmd of this.commands) {
+      this.commandMap.set(cmd.data.name, cmd)
+    }
+
+    this.client.on(Events.InteractionCreate, async interaction => {
+      if (!interaction.isChatInputCommand()) return
+
+      const command = this.commandMap.get(interaction.commandName)
+
+      if (!command) return
+
+      await command.execute(interaction)
+    })
   }
 
   async createGuidMessage() {

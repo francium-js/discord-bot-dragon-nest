@@ -23,11 +23,14 @@ const PARAMS = {
   // discord bot tokens
   RUBINART_DISCORD_TOKEN: Joi.string().required(),
   AISHA_DISCORD_TOKEN: Joi.string().required(),
+  KARAHAN_DISCORD_TOKEN: Joi.string().required(),
+  ARGENTA_DISCORD_TOKEN: Joi.string().required(),
 
   // discord channel ids
   PARTY_MANAGER_CHANNEL_ID: Joi.string().required(),
   CHARS_MANAGER_CHANNEL_ID: Joi.string().required(),
   ROLES_MANAGER_CHANNEL_ID: Joi.string().required(),
+  GUID_MANAGER_CHANNEL_ID: Joi.string().required(),
 }
 
 export const configSchema = Joi.object<typeof PARAMS>(PARAMS)

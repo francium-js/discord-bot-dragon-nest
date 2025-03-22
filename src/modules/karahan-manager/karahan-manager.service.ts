@@ -36,7 +36,7 @@ class KarahanManagerService implements OnModuleInit {
       partials: [Partials.Message, Partials.Channel, Partials.Reaction],
     })
 
-    this.panelChannelId = this.configService.get<string>('ROLES_MANAGER_CHANNEL_ID')
+    this.panelChannelId = process.env.ROLES_MANAGER_CHANNEL_ID
 
     this.regionServersRoles = {
       '🇪🇺': 'EU',
@@ -55,7 +55,7 @@ class KarahanManagerService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    const token = this.configService.get<string>('KARAHAN_DISCORD_TOKEN')
+    const token = process.env.KARAHAN_DISCORD_TOKEN
 
     if (!token) return
 
@@ -69,7 +69,7 @@ class KarahanManagerService implements OnModuleInit {
       await this.toggleRole(reaction, user, false)
     })
 
-    const channelId = this.configService.get<string>('ROLES_MANAGER_CHANNEL_ID')
+    const channelId = process.env.ROLES_MANAGER_CHANNEL_ID
     const channel = (await this.client.channels.fetch(channelId)) as TextChannel
 
     if (!channel) return
