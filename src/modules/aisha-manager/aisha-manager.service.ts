@@ -10,8 +10,7 @@ import {
 } from 'discord.js'
 
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
-import CharactersListService from './characters-list/characters-list.service'
-import CharacterAddService from './character-add/character-add.service'
+import { CharactersListService, CharacterAddService } from './services'
 
 @Injectable()
 class AishaManagerPanelService {
@@ -38,10 +37,6 @@ class AishaManagerPanelService {
 
   async onModuleInit() {
     const token = process.env.AISHA_DISCORD_TOKEN
-
-    if (!token) {
-      return
-    }
 
     await this.client.login(token)
 
@@ -73,7 +68,7 @@ class AishaManagerPanelService {
           return
         }
 
-        if (ComponentCustomIdEnum.SUBMIT_CHARACTER_ADD) {
+        if (interaction.customId === ComponentCustomIdEnum.SUBMIT_CHARACTER_ADD) {
           const channel = (await this.client.channels.fetch(
             this.charListDiscordChalledId,
           )) as TextChannel
@@ -139,11 +134,15 @@ class AishaManagerPanelService {
           new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
               .setCustomId(ComponentCustomIdEnum.OPEN_PANEL_CHARACTER_MANAGER)
-              .setLabel('Character manager')
+              .setLabel('Char-list')
               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(ComponentCustomIdEnum.OPEN_MODAL_INPUT_NICKNAME)
               .setLabel('Add character')
+              .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId(ComponentCustomIdEnum.OPEN_PANEL_EDIT_CHARACTER)
+              .setLabel('Edit character')
               .setStyle(ButtonStyle.Secondary),
           ),
         ],

@@ -7,6 +7,7 @@ import { AishaManagerModule } from './modules/aisha-manager/aisha-manager.module
 import { KarahanManagerModule } from './modules/karahan-manager/karahan-manager.module'
 import { ArgentaManagerModule } from './modules/argenta-manager/argenta-manager.module'
 import { AppConfig, DatabaseConfig } from './config'
+import { TresherDogModule } from './modules/tresher-dog/tresher-dog.module'
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AppConfig, DatabaseConfig } from './config'
       inject: [ConfigService],
     }),
     RedisModule,
+    TresherDogModule,
     ArgentaManagerModule,
     AishaManagerModule,
     RubinartManagerModule,

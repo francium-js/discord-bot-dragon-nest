@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import KarahanManagerService from './karahan-manager.service'
+import { KarahanManagerService } from './karahan-manager.service'
 
 @Module({
   providers: [KarahanManagerService],

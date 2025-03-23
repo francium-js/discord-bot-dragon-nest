@@ -26,7 +26,7 @@ import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
 import { classesEmojiMap, elementEmojiMap } from 'src/shared/constants/emoji-ids'
 import { CharacterClassEnum } from 'src/shared/enums/character-class'
 import { GeneralCharacterClassEnum } from 'src/shared/enums/general-character-class'
-import { successfulCharacterAdding } from 'src/shared/constants/successful-response'
+import { successfulCharacterAdding } from 'src/shared/constants/npc-response'
 import { InjectRepository } from '@nestjs/typeorm'
 import { UserEntity } from 'src/entities/user.entity'
 import { Repository } from 'typeorm'
@@ -34,7 +34,7 @@ import { CharacterEntity } from 'src/entities/character.entity'
 import { CharListEntity } from 'src/entities/char-list.entity'
 
 @Injectable()
-class CharacterAddService {
+export class CharacterAddService {
   private charListDiscordChalledId: string = process.env.CHARS_LIST_CHANNEL_ID
 
   constructor(
@@ -103,6 +103,29 @@ class CharacterAddService {
   async openModalInputNickNameForCreateUserCharacter(
     interaction: ButtonInteraction,
   ) {
+    const user = await this.userRepository.findOne({
+      where: { discordId: interaction.user.id },
+      relations: ['characters'],
+    })
+
+    if (!user) {
+      await this.generalComponentsService.sendErrorMessage(
+        ['Oops, something want wrong...', 'Write to Admin pleeease >.<'],
+        interaction,
+      )
+
+      return
+    }
+
+    if (user.characters.length > 20) {
+      await this.generalComponentsService.sendErrorMessage(
+        ['Max character count is 20'],
+        interaction,
+      )
+
+      return
+    }
+
     const modal = new ModalBuilder()
       .setCustomId(ComponentCustomIdEnum.MODAL_INPUT_NICKNAME)
       .setTitle('Input nickname of you character')
@@ -214,7 +237,7 @@ class CharacterAddService {
       charListDiscordMessage = newCharListMessage
 
       const thread = await newCharListMessage.startThread({
-        name: `${interaction.user.username}`,
+        name: `Gear info`,
         autoArchiveDuration: 60,
         reason: `Char list for ${interaction.user.tag}`,
       })
@@ -309,5 +332,3 @@ class CharacterAddService {
     )
   }
 }
-
-export default CharacterAddService

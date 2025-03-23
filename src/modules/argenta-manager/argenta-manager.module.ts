@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common'
-import ArgentaManagerService from './argenta-manager.service'
+import { ArgentaManagerService } from './argenta-manager.service'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { UserEntity } from 'src/entities/user.entity'
-import { ArgentaCommandsService } from './services/argenta-commands.service'
+import { ArgentaCommandsService } from './services'
 
 @Module({
   imports: [TypeOrmModule.forFeature([UserEntity])],

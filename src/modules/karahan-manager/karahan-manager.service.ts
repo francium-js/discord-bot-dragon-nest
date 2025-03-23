@@ -18,7 +18,7 @@ import { roleIdsMap } from 'src/shared/constants/role-ids'
 import { ServerRegionEnum } from 'src/shared/enums/server-region'
 
 @Injectable()
-class KarahanManagerService implements OnModuleInit {
+export class KarahanManagerService implements OnModuleInit {
   private client: Client
   private panelChannelId: string
   private regionServersRoles: Record<string, string>
@@ -56,8 +56,6 @@ class KarahanManagerService implements OnModuleInit {
 
   async onModuleInit() {
     const token = process.env.KARAHAN_DISCORD_TOKEN
-
-    if (!token) return
 
     await this.client.login(token)
 
@@ -169,5 +167,3 @@ class KarahanManagerService implements OnModuleInit {
     }
   }
 }
-
-export default KarahanManagerService

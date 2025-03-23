@@ -12,14 +12,13 @@ import {
   Collection,
   Routes,
 } from 'discord.js'
-import { ConfigService } from '@nestjs/config'
 import { UserEntity } from 'src/entities/user.entity'
 import { Repository } from 'typeorm'
 import { InjectRepository } from '@nestjs/typeorm'
-import { ArgentaCommandsService } from './services/argenta-commands.service'
+import { ArgentaCommandsService } from './services'
 
 @Injectable()
-class ArgentaManagerService implements OnModuleInit {
+export class ArgentaManagerService implements OnModuleInit {
   private client: Client
   private panelChannelId: string
   private commands: ArgentaCommandsService[] = []
@@ -37,7 +36,6 @@ class ArgentaManagerService implements OnModuleInit {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
-    private configService: ConfigService,
     private argentaCommandsService: ArgentaCommandsService,
   ) {
     this.client = new Client({
@@ -62,8 +60,6 @@ class ArgentaManagerService implements OnModuleInit {
     })
 
     const token = process.env.ARGENTA_DISCORD_TOKEN
-
-    if (!token) return
 
     await this.client.login(token)
 
@@ -179,5 +175,3 @@ https://discord.com/channels/1351560947105267792/1352008196994367608`,
     }
   }
 }
-
-export default ArgentaManagerService

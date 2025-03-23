@@ -31,7 +31,7 @@ import { UserCreatePartyPanelT } from 'src/shared/types/user-create-party-panel'
 import GeneralComponentsService from 'src/shared/services/general-components.service'
 
 @Injectable()
-class CreatePartyPanelService {
+export class CreatePartyPanelService {
   constructor(
     private readonly redisService: RedisService,
     private readonly generalComponentsService: GeneralComponentsService,
@@ -375,5 +375,3 @@ class CreatePartyPanelService {
     })
   }
 }
-
-export default CreatePartyPanelService

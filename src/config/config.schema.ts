@@ -25,6 +25,14 @@ const PARAMS = {
   AISHA_DISCORD_TOKEN: Joi.string().required(),
   KARAHAN_DISCORD_TOKEN: Joi.string().required(),
   ARGENTA_DISCORD_TOKEN: Joi.string().required(),
+  TRESHER_DOG_TOKEN: Joi.string().required(),
+
+  // discord bot client ids
+  RUBINART_CLIENT_ID: Joi.string().required(),
+  AISHA_CLIENT_ID: Joi.string().required(),
+  KARAHAN_CLIENT_ID: Joi.string().required(),
+  ARGENTA_CLIENT_ID: Joi.string().required(),
+  TRESHER_DOG_CLIEND_ID: Joi.string().required(),
 
   // discord channel ids
   PARTY_MANAGER_CHANNEL_ID: Joi.string().required(),

@@ -9,10 +9,10 @@ import {
   Events,
 } from 'discord.js'
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
-import CreatePartyPanelService from './create-party-panel/create-party-panel.service'
+import { CreatePartyPanelService } from './services'
 
 @Injectable()
-class RubinartManagerService implements OnModuleInit {
+export class RubinartManagerService implements OnModuleInit {
   private client: Client
   private panelChannelId: string
 
@@ -31,10 +31,6 @@ class RubinartManagerService implements OnModuleInit {
 
   async onModuleInit() {
     const token = process.env.RUBINART_DISCORD_TOKEN
-
-    if (!token) {
-      return
-    }
 
     await this.client.login(token)
 
@@ -132,5 +128,3 @@ class RubinartManagerService implements OnModuleInit {
     }
   }
 }
-
-export default RubinartManagerService
