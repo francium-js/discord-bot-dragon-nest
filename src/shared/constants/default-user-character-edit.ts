@@ -1,11 +1,12 @@
 import { CharacterClassEnum } from '../enums/character-class'
 import { GeneralCharacterClassEnum } from '../enums/general-character-class'
-import { UserCharacterAddT } from '../types/user-characters-add'
+import { UserCharacterEditT } from '../types/user-character-edit'
 
-export const defaultUserCharacterAdd: UserCharacterAddT = {
+export const defaultUserCharacterEdit: UserCharacterEditT = {
   name: '',
   class: '' as CharacterClassEnum,
   generalClass: '' as GeneralCharacterClassEnum,
   elements: [],
   userDiscordId: null!,
+  selectedCharId: null!,
 }

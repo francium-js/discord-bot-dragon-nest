@@ -7,5 +7,5 @@ export const defaultUserCreatePartyPanel: UserCreatePartyPanelT = {
   timeStart: '',
   timeEnd: '',
   classPriorityLoot: false,
-  userId: null!,
+  userDiscordId: null!,
 }

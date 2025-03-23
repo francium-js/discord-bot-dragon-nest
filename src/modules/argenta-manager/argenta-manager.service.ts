@@ -52,6 +52,12 @@ export class ArgentaManagerService implements OnModuleInit {
 
   async onModuleInit() {
     this.client.on(Events.GuildMemberAdd, async (member: GuildMember) => {
+      const isExistUser = await this.userRepository.findOne({
+        where: { discordId: member.user.id },
+      })
+
+      if (isExistUser) return
+
       const newUser = this.userRepository.create({
         discordId: member.user.id,
       })

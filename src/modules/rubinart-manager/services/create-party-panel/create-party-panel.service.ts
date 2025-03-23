@@ -29,6 +29,7 @@ import { RedisCacheDuration } from 'src/shared/enums/redis-cache-duration'
 import { DateTime } from 'luxon'
 import { UserCreatePartyPanelT } from 'src/shared/types/user-create-party-panel'
 import GeneralComponentsService from 'src/shared/services/general-components.service'
+import { PanelEnum } from 'src/shared/enums/panel'
 
 @Injectable()
 export class CreatePartyPanelService {
@@ -95,7 +96,7 @@ export class CreatePartyPanelService {
     const payLoad = await this.mutateInteraction(
       userData || {
         ...defaultUserCreatePartyPanel,
-        userId: interaction.user.id,
+        userDiscordId: interaction.user.id,
       },
     )
 
@@ -123,7 +124,7 @@ export class CreatePartyPanelService {
     }
 
     await this.redisService.setCache({
-      key: RedisCacheKey.USER_PANEL_CREATE_PARTY + userData.userId,
+      key: RedisCacheKey.USER_PANEL_CREATE_PARTY + userData.userDiscordId,
       value: userData,
       ttl: RedisCacheDuration.USER_PANEL_CREATE_PARTY,
     })
@@ -134,7 +135,10 @@ export class CreatePartyPanelService {
     const components = [
       this.createServerSelectMenus(userData.server as ServerRegionEnum),
       this.createNestSelectMenus(userData.nest as NestEnum),
-      this.generalComponentsService.createElementButtons(userData.elements),
+      this.generalComponentsService.createElementButtons(
+        PanelEnum.CREATE_PARTY,
+        userData.elements,
+      ),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         this.createTimeButton(),
         this.createClassPriorityLootToggle(userData.classPriorityLoot),
@@ -281,7 +285,7 @@ export class CreatePartyPanelService {
 
     if (!fromTime.isValid || !toTime.isValid) {
       await this.generalComponentsService.sendErrorMessage(
-        ['❌ **Wrong format:** Need `HH:MM` format (Example, `12:30`)'],
+        ['🛑 **Wrong format:** Need `HH:MM` format (Example, `12:30`)'],
         interaction,
       )
 
@@ -298,7 +302,7 @@ export class CreatePartyPanelService {
 
     if (timeEnd < oneHourLater) {
       await this.generalComponentsService.sendErrorMessage(
-        ['❌ **Error:** Start time must be at least **1 hour** from server time.'],
+        ['🛑 **Error:** Start time must be at least **1 hour** from server time.'],
         interaction,
       )
 
@@ -307,7 +311,7 @@ export class CreatePartyPanelService {
 
     if (timeEnd - timeStart < 30 * 60 * 1000) {
       await this.generalComponentsService.sendErrorMessage(
-        ['❌ **Error:** The time range must be at least **30 minutes**.'],
+        ['🛑 **Error:** The time range must be at least **30 minutes**.'],
         interaction,
       )
 
@@ -333,7 +337,7 @@ export class CreatePartyPanelService {
   }
 
   async handleCreateParty(interaction: ButtonInteraction) {
-    // const userId = interaction.user.id
+    // const userDiscordId = interaction.user.id
     // const userData = await this.redisService.getCache<UserCreatePartyPanelT>(RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id)
 
     const userData = await this.redisService.getCache<UserCreatePartyPanelT>(

@@ -3,11 +3,19 @@ import { UserEntity } from './user.entity'
 import { CharacterClassEnum } from '../shared/enums/character-class'
 import { ElementEnum } from '../shared/enums/element'
 import { CharListEntity } from './char-list.entity'
+import { GeneralCharacterClassEnum } from 'src/shared/enums/general-character-class'
 
 @Entity({ name: 'characters' })
 export class CharacterEntity {
   @PrimaryGeneratedColumn()
   id: number
+
+  @Column({
+    type: 'enum',
+    enum: GeneralCharacterClassEnum,
+    nullable: false,
+  })
+  generalClass: GeneralCharacterClassEnum
 
   @Column({
     type: 'enum',
@@ -22,7 +30,7 @@ export class CharacterEntity {
     array: true,
     nullable: true,
   })
-  element: ElementEnum[]
+  elements: ElementEnum[]
 
   @Column({
     type: 'varchar',

@@ -32,6 +32,7 @@ import { UserEntity } from 'src/entities/user.entity'
 import { Repository } from 'typeorm'
 import { CharacterEntity } from 'src/entities/character.entity'
 import { CharListEntity } from 'src/entities/char-list.entity'
+import { PanelEnum } from 'src/shared/enums/panel'
 
 @Injectable()
 export class CharacterAddService {
@@ -48,11 +49,20 @@ export class CharacterAddService {
     private readonly charListRepository: Repository<CharListEntity>,
   ) {}
 
-  async createPanel(interaction: ModalSubmitInteraction, nickname: string) {
+  async createPanel(interaction: ModalSubmitInteraction, name: string) {
+    if (name.length > 25) {
+      await this.generalComponentsService.sendErrorMessage(
+        ['🛑 **Error:** Max character name length is 25.'],
+        interaction,
+      )
+
+      return
+    }
+
     const payLoad = await this.mutateInteraction({
       ...defaultUserCharacterAdd,
-      nickname,
-      userId: interaction.user.id,
+      name,
+      userDiscordId: interaction.user.id,
     })
 
     await interaction.reply({ ...payLoad, flags: MessageFlags.Ephemeral })
@@ -71,25 +81,29 @@ export class CharacterAddService {
     const newCharacterEmbed = new EmbedBuilder().setColor(0xdbc907).addFields([
       {
         name: '',
-        value: `${classText} **${userData.nickname}** ${elementsText}`,
+        value: `${classText} **${userData.name}** ${elementsText}`,
       },
     ])
 
     await this.redisService.setCache({
-      key: RedisCacheKey.USER_PANEL_CHARACTER_ADD + userData.userId,
+      key: RedisCacheKey.USER_PANEL_CHARACTER_ADD + userData.userDiscordId,
       value: userData,
       ttl: RedisCacheDuration.USER_PANEL_CHARACTER_ADD,
     })
 
     const components = [
-      this.generalComponentsService.createElementButtons(userData.elements),
+      this.generalComponentsService.createElementButtons(
+        PanelEnum.ADD_CHAR,
+        userData.elements,
+      ),
       ...this.generalComponentsService.createClassSelectMenus(
         userData.class,
         userData.generalClass,
+        PanelEnum.ADD_CHAR,
       ),
       this.generalComponentsService.createActionButtons(
         ComponentCustomIdEnum.SUBMIT_CHARACTER_ADD,
-        'Submit',
+        'Create',
         Boolean(!userData.class),
       ),
     ]
@@ -180,12 +194,18 @@ export class CharacterAddService {
       RedisCacheKey.USER_PANEL_CHARACTER_ADD + interaction.user.id,
     )
 
-    if (interaction.customId === ComponentCustomIdEnum.SELECT_GENERAL_CLASS) {
+    if (
+      interaction.customId ===
+      PanelEnum.ADD_CHAR + ComponentCustomIdEnum.SELECT_GENERAL_CLASS
+    ) {
       userData.generalClass = interaction.values[0] as GeneralCharacterClassEnum
       userData.class = '' as CharacterClassEnum
     }
 
-    if (interaction.customId === ComponentCustomIdEnum.SELECT_CLASS) {
+    if (
+      interaction.customId ===
+      PanelEnum.ADD_CHAR + ComponentCustomIdEnum.SELECT_CLASS
+    ) {
       userData.class = interaction.values[0] as CharacterClassEnum
     }
 
@@ -216,7 +236,7 @@ export class CharacterAddService {
       : ''
 
     let user = await this.userRepository.findOne({
-      where: { discordId: userData.userId },
+      where: { discordId: userData.userDiscordId },
     })
 
     if (!user) return
@@ -260,10 +280,11 @@ export class CharacterAddService {
     }
 
     const newCharacter = this.characterRepository.create({
-      name: userData.nickname,
+      name: userData.name,
       user,
-      element: userData.elements,
+      elements: userData.elements,
       class: userData.class,
+      generalClass: userData.generalClass,
       charList: userCharList,
     })
 
@@ -281,7 +302,7 @@ export class CharacterAddService {
       },
       ...updatedCharList.characters.map(char => {
         const elementsText =
-          char.element
+          char.elements
             .map(element => `<:${element}:${elementEmojiMap[element]}>`)
             .join('') || ''
 
@@ -318,7 +339,7 @@ export class CharacterAddService {
       },
       {
         name: '',
-        value: `${classText} **${userData.nickname}** ${elementsText} added to characters list`,
+        value: `${classText} **${userData.name}** ${elementsText} added to characters list`,
       },
     )
 

@@ -62,7 +62,7 @@ export class TresherDogService implements OnModuleInit {
           const errorEmbed = new EmbedBuilder().setColor(0xf50909).addFields([
             {
               name: '',
-              value: `❌ ${randomQuote}`,
+              value: `🛑 ${randomQuote}`,
             },
           ])
 
@@ -76,7 +76,7 @@ export class TresherDogService implements OnModuleInit {
           setTimeout(async () => {
             await warning.delete().catch(() => {})
             await thread.setArchived(true)
-          }, 10_000)
+          }, 5000)
         }
       } catch (err) {
         console.error(`❌ Error while checking message thread:`, err)

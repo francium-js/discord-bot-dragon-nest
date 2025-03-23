@@ -16,6 +16,7 @@ import { ElementEnum } from 'src/shared/enums/element'
 import { CharacterClassEnum } from '../enums/character-class'
 import { GeneralCharacterClassEnum } from '../enums/general-character-class'
 import { classesMap } from '../constants/classes-map'
+import { PanelEnum } from '../enums/panel'
 
 Injectable()
 
@@ -52,11 +53,13 @@ class GeneralComponentsService {
     })
   }
 
-  createElementButtons(selectedElements: string[] = []) {
+  createElementButtons(panelType: PanelEnum, selectedElements: string[] = []) {
     return new ActionRowBuilder<ButtonBuilder>().addComponents(
       Object.values(ElementEnum).map(element =>
         new ButtonBuilder()
-          .setCustomId(`${ComponentCustomIdEnum.SELECT_ELEMENT}_${element}`)
+          .setCustomId(
+            `${panelType + ComponentCustomIdEnum.SELECT_ELEMENT}_${element}`,
+          )
           .setEmoji(elementEmojiMap[element])
           .setLabel(element)
           .setStyle(
@@ -71,11 +74,12 @@ class GeneralComponentsService {
   createClassSelectMenus(
     selectedClass: CharacterClassEnum,
     selectedGeneralClass: GeneralCharacterClassEnum,
+    panelType: PanelEnum,
   ) {
     const generalClassesSelect =
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
         new StringSelectMenuBuilder()
-          .setCustomId(ComponentCustomIdEnum.SELECT_GENERAL_CLASS)
+          .setCustomId(panelType + ComponentCustomIdEnum.SELECT_GENERAL_CLASS)
           .setPlaceholder('Select general class')
           .addOptions(
             Object.values(GeneralCharacterClassEnum).map(item => {
@@ -99,7 +103,7 @@ class GeneralComponentsService {
       const classesSelect =
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
           new StringSelectMenuBuilder()
-            .setCustomId(ComponentCustomIdEnum.SELECT_CLASS)
+            .setCustomId(panelType + ComponentCustomIdEnum.SELECT_CLASS)
             .setPlaceholder('Select class')
             .addOptions(
               classesMap[selectedGeneralClass].map(item => {

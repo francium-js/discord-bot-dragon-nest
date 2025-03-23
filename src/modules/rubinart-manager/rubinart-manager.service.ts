@@ -10,6 +10,7 @@ import {
 } from 'discord.js'
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
 import { CreatePartyPanelService } from './services'
+import { PanelEnum } from 'src/shared/enums/panel'
 
 @Injectable()
 export class RubinartManagerService implements OnModuleInit {
@@ -53,7 +54,9 @@ export class RubinartManagerService implements OnModuleInit {
 
       if (interaction.isButton()) {
         if (
-          interaction.customId.startsWith(`${ComponentCustomIdEnum.SELECT_ELEMENT}_`)
+          interaction.customId.startsWith(
+            `${PanelEnum.CREATE_PARTY + ComponentCustomIdEnum.SELECT_ELEMENT}_`,
+          )
         ) {
           await this.createPartyPanelService.handleElementSelection(interaction)
 

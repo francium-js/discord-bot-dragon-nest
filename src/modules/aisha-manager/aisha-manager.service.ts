@@ -11,6 +11,8 @@ import {
 
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
 import { CharactersListService, CharacterAddService } from './services'
+import { PanelEnum } from 'src/shared/enums/panel'
+import { CharacterEditService } from './services/character-edit/character-edit.service'
 
 @Injectable()
 class AishaManagerPanelService {
@@ -22,6 +24,7 @@ class AishaManagerPanelService {
   constructor(
     private readonly charactersListService: CharactersListService,
     private readonly characterAddService: CharacterAddService,
+    private readonly characterEditService: CharacterEditService,
   ) {
     this.client = new Client({
       intents: [
@@ -59,11 +62,34 @@ class AishaManagerPanelService {
         }
       }
 
+      if (interaction.isModalSubmit()) {
+        const modalInteraction = interaction
+
+        if (
+          modalInteraction.customId ===
+          ComponentCustomIdEnum.MODAL_INPUT_NICKNAME_FOR_EDIT
+        ) {
+          await this.characterEditService.editCharacterNameSubmited(modalInteraction)
+        }
+      }
+
       if (interaction.isButton()) {
         if (
-          interaction.customId.startsWith(`${ComponentCustomIdEnum.SELECT_ELEMENT}_`)
+          interaction.customId.startsWith(
+            `${PanelEnum.ADD_CHAR + ComponentCustomIdEnum.SELECT_ELEMENT}_`,
+          )
         ) {
           await this.characterAddService.handleElementSelection(interaction)
+
+          return
+        }
+
+        if (
+          interaction.customId.startsWith(
+            `${PanelEnum.EDIT_CHAR + ComponentCustomIdEnum.SELECT_ELEMENT}_`,
+          )
+        ) {
+          await this.characterEditService.handleElementSelection(interaction)
 
           return
         }
@@ -78,12 +104,35 @@ class AishaManagerPanelService {
           return
         }
 
+        if (interaction.customId === ComponentCustomIdEnum.SUBMIT_CHARACTER_EDIT) {
+          const channel = (await this.client.channels.fetch(
+            this.charListDiscordChalledId,
+          )) as TextChannel
+
+          await this.characterEditService.submitCharacterEdit(interaction, channel)
+
+          return
+        }
+
+        if (interaction.customId === ComponentCustomIdEnum.SUBMIT_CHARACTER_DELETE) {
+          const channel = (await this.client.channels.fetch(
+            this.charListDiscordChalledId,
+          )) as TextChannel
+
+          await this.characterEditService.submitCharacterDelete(interaction, channel)
+
+          return
+        }
+
         switch (interaction.customId) {
           case ComponentCustomIdEnum.OPEN_PANEL_CHARACTER_MANAGER:
             await this.charactersListService.createPanel(interaction)
             break
-          case ComponentCustomIdEnum.MODAL_INPUT_NICKNAME:
-            await this.characterAddService.openModalInputNickNameForCreateUserCharacter(
+          case ComponentCustomIdEnum.OPEN_PANEL_EDIT_CHARACTER:
+            await this.characterEditService.createPanel(interaction)
+            break
+          case ComponentCustomIdEnum.OPEN_MODAL_INPUT_NICKNAME_FOR_EDIT:
+            await this.characterEditService.openModalInputNickNameForEditUserCharacter(
               interaction,
             )
             break
@@ -96,7 +145,20 @@ class AishaManagerPanelService {
       }
 
       if (interaction.isStringSelectMenu()) {
-        await this.characterAddService.handleSelectMenu(interaction)
+        if (interaction.customId.startsWith(PanelEnum.ADD_CHAR)) {
+          await this.characterAddService.handleSelectMenu(interaction)
+
+          return
+        }
+
+        if (
+          interaction.customId.startsWith(PanelEnum.EDIT_CHAR) ||
+          ComponentCustomIdEnum.SELECT_CHARACTER_FOR_EDIT
+        ) {
+          await this.characterEditService.handleSelectMenu(interaction)
+
+          return
+        }
       }
     })
 
@@ -138,11 +200,11 @@ class AishaManagerPanelService {
               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(ComponentCustomIdEnum.OPEN_MODAL_INPUT_NICKNAME)
-              .setLabel('Add character')
+              .setLabel('Add char')
               .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(ComponentCustomIdEnum.OPEN_PANEL_EDIT_CHARACTER)
-              .setLabel('Edit character')
+              .setLabel('Edit char')
               .setStyle(ButtonStyle.Secondary),
           ),
         ],
