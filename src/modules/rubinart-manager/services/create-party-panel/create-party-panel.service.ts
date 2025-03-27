@@ -30,12 +30,19 @@ import { DateTime } from 'luxon'
 import { UserCreatePartyPanelT } from 'src/shared/types/user-create-party-panel'
 import GeneralComponentsService from 'src/shared/services/general-components.service'
 import { PanelEnum } from 'src/shared/enums/panel'
+import { InjectRepository } from '@nestjs/typeorm'
+import { CharListEntity } from 'src/entities/char-list.entity'
+import { Repository } from 'typeorm'
+import { classesEmojiMap } from 'src/shared/constants/emoji-ids'
+import { CharacterEntity } from 'src/entities/character.entity'
 
 @Injectable()
 export class CreatePartyPanelService {
   constructor(
     private readonly redisService: RedisService,
     private readonly generalComponentsService: GeneralComponentsService,
+    @InjectRepository(CharListEntity)
+    private readonly charListRepository: Repository<CharListEntity>,
   ) {}
 
   createTimeButton() {
@@ -53,9 +60,13 @@ export class CreatePartyPanelService {
     const { timeStart, timeEnd } = userData
 
     const formattedStartTime = DateTime.fromMillis(Number(timeStart)).toFormat(
-      'HH:mm',
+      'HH:mm dd/LL',
     )
-    const formattedEndTime = DateTime.fromMillis(Number(timeEnd)).toFormat('HH:mm')
+    const formattedEndTime = DateTime.fromMillis(Number(timeEnd)).toFormat(
+      'HH:mm dd/LL',
+    )
+
+    const datePlus2 = DateTime.now().plus({ days: 2 }).toFormat('dd/LL')
 
     const modal = new ModalBuilder()
       .setCustomId(ComponentCustomIdEnum.TIME_MODAL)
@@ -63,16 +74,16 @@ export class CreatePartyPanelService {
 
     const fromTimeInput = new TextInputBuilder()
       .setCustomId(ComponentCustomIdEnum.TIME_START)
-      .setLabel('Start Time (HH:MM)')
+      .setLabel('Start Time (HH:MM dd/mm)')
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder('00:00')
+      .setPlaceholder(`Example "12:30 ${datePlus2}"`)
       .setRequired(false)
 
     const toTimeInput = new TextInputBuilder()
       .setCustomId(ComponentCustomIdEnum.TIME_END)
-      .setLabel('End Time (HH:MM)')
+      .setLabel('End Time (HH:MM dd/mm)')
       .setStyle(TextInputStyle.Short)
-      .setPlaceholder('00:00')
+      .setPlaceholder(`Example "17:45 ${datePlus2}"`)
       .setRequired(false)
 
     if (timeStart && timeEnd) {
@@ -89,16 +100,28 @@ export class CreatePartyPanelService {
   }
 
   async createPanel(interaction: ButtonInteraction) {
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    const userCharList = await this.charListRepository.findOne({
+      where: { user: { discordId: interaction.user.id } },
+      relations: ['characters'],
+    })
 
-    const payLoad = await this.mutateInteraction(
-      userData || {
-        ...defaultUserCreatePartyPanel,
-        userDiscordId: interaction.user.id,
-      },
-    )
+    if (!userCharList || !userCharList?.characters?.length) {
+      await this.generalComponentsService.sendErrorMessage(
+        [
+          'You have not characters',
+          `You can create character here ${process.env.DISCORD_GUILD_LINK}${process.env.CHARS_MANAGER_CHANNEL_ID}`,
+        ],
+        interaction,
+      )
+
+      return
+    }
+
+    const payLoad = await this.mutateInteraction({
+      ...defaultUserCreatePartyPanel,
+      userDiscordId: interaction.user.id,
+      characters: userCharList?.characters,
+    })
 
     await interaction.reply({ ...payLoad, flags: MessageFlags.Ephemeral })
   }
@@ -111,16 +134,47 @@ export class CreatePartyPanelService {
       .setImage(selectedNest?.imgUrl || defaultBannerForPanel)
 
     if (userData.timeStart && userData.timeEnd) {
-      const formattedStartTime = DateTime.fromMillis(
-        Number(userData.timeStart),
-      ).toFormat('HH:mm')
-      const formattedEndTime = DateTime.fromMillis(
-        Number(userData.timeEnd),
-      ).toFormat('HH:mm')
+      const { timeStart, timeEnd } = userData
 
-      updatedEmbed.setDescription(
-        `⏳ **Time Zone:** ${formattedStartTime} - ${formattedEndTime}`,
+      const formattedStartTimeHourse = DateTime.fromMillis(Number(timeStart))
+        .setZone('Europe/Berlin')
+        .toFormat('HH:mm')
+      const formattedEndTimeHourse = DateTime.fromMillis(Number(timeEnd))
+        .setZone('Europe/Berlin')
+        .toFormat('HH:mm')
+
+      const formattedStartTimeDays = DateTime.fromMillis(Number(timeStart))
+        .setZone('Europe/Berlin')
+        .toFormat('dd/LL')
+      const formattedEndTimeDays = DateTime.fromMillis(Number(timeEnd))
+        .setZone('Europe/Berlin')
+        .toFormat('dd/LL')
+
+      const isSameDays = formattedStartTimeDays === formattedEndTimeDays
+
+      updatedEmbed.setTitle('⏳ **Time Zone** ⏳')
+
+      const unixStart = Math.floor(
+        DateTime.fromMillis(Number(timeStart)).toSeconds(),
       )
+      const unixEnd = Math.floor(DateTime.fromMillis(Number(timeEnd)).toSeconds())
+
+      if (isSameDays) {
+        updatedEmbed.setDescription(
+          `Server time: **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - ${formattedEndTimeHourse}
+          Your time: <t:${unixStart}:D> <t:${unixStart}:t> - <t:${unixEnd}:t>`,
+        )
+      } else {
+        updatedEmbed.setDescription(
+          `Server-time:
+          **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - start
+          **${formattedEndTimeDays}** | ${formattedEndTimeHourse} - end
+          
+          Your time:
+          <t:${unixStart}:D> <t:${unixStart}:t> - start
+          <t:${unixEnd}:D> <t:${unixEnd}:t> - end`,
+        )
+      }
     }
 
     await this.redisService.setCache({
@@ -132,28 +186,58 @@ export class CreatePartyPanelService {
     const isDisabledSubmit =
       !userData.nest || !userData.server || !userData.timeEnd || !userData.timeStart
 
-    const components = [
-      this.createServerSelectMenus(userData.server as ServerRegionEnum),
-      this.createNestSelectMenus(userData.nest as NestEnum),
-      this.generalComponentsService.createElementButtons(
-        PanelEnum.CREATE_PARTY,
-        userData.elements,
-      ),
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        this.createTimeButton(),
-        this.createClassPriorityLootToggle(userData.classPriorityLoot),
-      ),
-      this.generalComponentsService.createActionButtons(
-        ComponentCustomIdEnum.SUBMIT_CREATE_PARTY,
-        'Submit',
-        isDisabledSubmit,
-      ),
-    ]
+    const isRenderComponentsForEditChar = () => {
+      if (!userData.selectedCharId) {
+        return [
+          this.createNicknameSelectMenus(
+            userData.selectedCharId,
+            userData.characters,
+          ),
+        ]
+      }
+
+      return [
+        this.createServerSelectMenus(userData.server as ServerRegionEnum),
+        this.createNestSelectMenus(userData.nest as NestEnum),
+        this.generalComponentsService.createElementButtons(
+          PanelEnum.CREATE_PARTY,
+          userData.elements,
+        ),
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          this.createTimeButton(),
+          this.createClassPriorityLootToggle(userData.classPriorityLoot),
+        ),
+        this.generalComponentsService.createActionButtons(
+          ComponentCustomIdEnum.SUBMIT_CREATE_PARTY,
+          'Submit',
+          isDisabledSubmit,
+        ),
+      ]
+    }
 
     return {
       embeds: [updatedEmbed],
-      components,
+      components: isRenderComponentsForEditChar(),
     }
+  }
+
+  createNicknameSelectMenus(selectedCharId: number, characters?: CharacterEntity[]) {
+    const serverSelect = new StringSelectMenuBuilder()
+      .setCustomId(ComponentCustomIdEnum.SELECT_CHARACTER_FOR_CREATE_PARTY)
+      .setPlaceholder('Select your char')
+      .addOptions(
+        ...characters.map(char =>
+          new StringSelectMenuOptionBuilder()
+            .setEmoji(classesEmojiMap[char.class])
+            .setLabel(char.name)
+            .setValue(String(char.id))
+            .setDefault(selectedCharId === char.id),
+        ),
+      )
+
+    return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      serverSelect,
+    )
   }
 
   createServerSelectMenus(selectedServer?: ServerRegionEnum) {
@@ -257,6 +341,13 @@ export class CreatePartyPanelService {
       RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
     )
 
+    if (
+      interaction.customId ===
+      ComponentCustomIdEnum.SELECT_CHARACTER_FOR_CREATE_PARTY
+    ) {
+      userData.selectedCharId = Number(interaction.values[0])
+    }
+
     if (interaction.customId === ComponentCustomIdEnum.SELECT_NEST) {
       userData.nest = interaction.values[0] as NestEnum
     }
@@ -280,27 +371,36 @@ export class CreatePartyPanelService {
       ComponentCustomIdEnum.TIME_END,
     )
 
-    const fromTime = DateTime.fromFormat(fromTimeRaw, 'HH:mm')
-    const toTime = DateTime.fromFormat(toTimeRaw, 'HH:mm')
+    const fromTime = DateTime.fromFormat(fromTimeRaw, 'HH:mm dd/LL', {
+      zone: 'Europe/Berlin',
+    })
+    const toTime = DateTime.fromFormat(toTimeRaw, 'HH:mm dd/LL', {
+      zone: 'Europe/Berlin',
+    })
 
     if (!fromTime.isValid || !toTime.isValid) {
+      const datePlus2 = DateTime.now().plus({ days: 2 }).toFormat('dd/LL')
+
       await this.generalComponentsService.sendErrorMessage(
-        ['🛑 **Wrong format:** Need `HH:MM` format (Example, `12:30`)'],
+        [
+          `🛑 **Wrong format:**`,
+          `Need **HH:MM dd/mm** format`,
+          `Example: **12:30 ${datePlus2}**`,
+        ],
         interaction,
       )
 
       return
     }
 
-    const now = DateTime.now()
-    const timeStart = now
-      .set({ hour: fromTime.hour, minute: fromTime.minute })
-      .toMillis()
-    const timeEnd = now.set({ hour: toTime.hour, minute: toTime.minute }).toMillis()
+    const now = DateTime.now().toUTC()
+
+    const timeStart = fromTime.toUTC().toMillis()
+    const timeEnd = toTime.toUTC().toMillis()
 
     const oneHourLater = now.plus({ hours: 1 }).toMillis()
 
-    if (timeEnd < oneHourLater) {
+    if (timeStart < oneHourLater) {
       await this.generalComponentsService.sendErrorMessage(
         ['🛑 **Error:** Start time must be at least **1 hour** from server time.'],
         interaction,
@@ -353,13 +453,13 @@ export class CreatePartyPanelService {
         .setLabel(`Link to your party`)
         .setStyle(ButtonStyle.Link)
         .setURL(
-          'https://discord.com/channels/1351560947105267792/1351560949412270132/1352757387483938929',
+          `${process.env.DISCORD_GUILD_LINK}${process.env.PARTY_LIST_CHANNEL_ID}`,
         ),
       new ButtonBuilder()
-        .setLabel(`Link to DS raid branch`)
+        .setLabel(`Link to DS to your private party branch`)
         .setStyle(ButtonStyle.Link)
         .setURL(
-          'https://discord.com/channels/1351560947105267792/1351560949412270132/1352757387483938929',
+          `${process.env.DISCORD_GUILD_LINK}${process.env.PARTY_LIST_CHANNEL_ID}`,
         ),
     )
 

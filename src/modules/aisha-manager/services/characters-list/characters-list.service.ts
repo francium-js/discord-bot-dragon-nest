@@ -24,11 +24,12 @@ export class CharactersListService {
   async createPanel(interaction: ButtonInteraction) {
     const userCharList = await this.charListRepository.findOne({
       where: { user: { discordId: interaction.user.id } },
+      relations: ['characters'],
     })
 
-    if (!userCharList) {
+    if (!userCharList || !userCharList?.characters?.length) {
       await this.generalComponentsService.sendErrorMessage(
-        ['Oops, something want wrong...', 'Write to Admin pleeease >.<'],
+        ['You have not characters'],
         interaction,
       )
 

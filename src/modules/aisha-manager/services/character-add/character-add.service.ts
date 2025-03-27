@@ -324,7 +324,7 @@ export class CharacterAddService {
         .setLabel(`Link to your char-list`)
         .setStyle(ButtonStyle.Link)
         .setURL(
-          `https://discord.com/channels/1351560947105267792/${this.charListDiscordChalledId}/${charListDiscordMessage.id}`,
+          `${process.env.DISCORD_GUILD_LINK}${this.charListDiscordChalledId}/${charListDiscordMessage.id}`,
         ),
     )
 

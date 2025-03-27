@@ -83,6 +83,15 @@ export class RubinartManagerService implements OnModuleInit {
       }
 
       if (interaction.isStringSelectMenu()) {
+        if (
+          interaction.customId ===
+          ComponentCustomIdEnum.SELECT_CHARACTER_FOR_CREATE_PARTY
+        ) {
+          await this.createPartyPanelService.handleSelectMenu(interaction)
+
+          return
+        }
+
         await this.createPartyPanelService.handleSelectMenu(interaction)
       }
     })

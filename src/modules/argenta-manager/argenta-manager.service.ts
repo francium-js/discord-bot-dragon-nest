@@ -47,7 +47,7 @@ export class ArgentaManagerService implements OnModuleInit {
       ],
     })
 
-    this.panelChannelId = process.env.GUID_MANAGER_CHANNEL_ID
+    this.panelChannelId = process.env.GUID_CHANNEL_ID
   }
 
   async onModuleInit() {
@@ -69,7 +69,7 @@ export class ArgentaManagerService implements OnModuleInit {
 
     await this.client.login(token)
 
-    const channelId = process.env.GUID_MANAGER_CHANNEL_ID
+    const channelId = process.env.GUID_CHANNEL_ID
     const channel = (await this.client.channels.fetch(channelId)) as TextChannel
 
     if (!channel) return

@@ -1,3 +1,4 @@
+import { CharacterEntity } from 'src/entities/character.entity'
 import { NestEnum } from 'src/shared/enums/nests'
 import { ServerRegionEnum } from 'src/shared/enums/server-region'
 
@@ -9,4 +10,6 @@ export type UserCreatePartyPanelT = {
   timeStart: string
   timeEnd: string
   classPriorityLoot: boolean
+  selectedCharId?: number
+  characters: CharacterEntity[]
 }

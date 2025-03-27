@@ -153,7 +153,7 @@ export class CharacterEditService {
         new ActionRowBuilder<ButtonBuilder>().addComponents(
           new ButtonBuilder()
             .setCustomId(ComponentCustomIdEnum.SUBMIT_CHARACTER_EDIT)
-            .setLabel('Edit ' + selectedCharForEdit.name)
+            .setLabel('Submit ' + selectedCharForEdit.name)
             .setDisabled(
               Boolean(
                 !userData.class ||
@@ -381,7 +381,7 @@ export class CharacterEditService {
         .setLabel(`Link to your char-list`)
         .setStyle(ButtonStyle.Link)
         .setURL(
-          `https://discord.com/channels/1351560947105267792/${this.charListDiscordChalledId}/${charListDiscordMessage.id}`,
+          `${process.env.DISCORD_GUILD_LINK}${this.charListDiscordChalledId}/${charListDiscordMessage.id}`,
         ),
     )
 
@@ -483,7 +483,7 @@ export class CharacterEditService {
         .setLabel(`Link to your char-list`)
         .setStyle(ButtonStyle.Link)
         .setURL(
-          `https://discord.com/channels/1351560947105267792/${this.charListDiscordChalledId}/${charListDiscordMessage.id}`,
+          `${process.env.DISCORD_GUILD_LINK}${this.charListDiscordChalledId}/${charListDiscordMessage.id}`,
         ),
     )
 

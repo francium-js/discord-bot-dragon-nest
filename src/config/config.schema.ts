@@ -20,6 +20,9 @@ const PARAMS = {
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().default(6380),
 
+  // discord guild link
+  DISCORD_GUILD_LINK: Joi.string().required(),
+
   // discord bot tokens
   RUBINART_DISCORD_TOKEN: Joi.string().required(),
   AISHA_DISCORD_TOKEN: Joi.string().required(),
@@ -38,7 +41,8 @@ const PARAMS = {
   PARTY_MANAGER_CHANNEL_ID: Joi.string().required(),
   CHARS_MANAGER_CHANNEL_ID: Joi.string().required(),
   ROLES_MANAGER_CHANNEL_ID: Joi.string().required(),
-  GUID_MANAGER_CHANNEL_ID: Joi.string().required(),
+  GUID_CHANNEL_ID: Joi.string().required(),
+  PARTY_LIST_CHANNEL_ID: Joi.string().required(),
 }
 
 export const configSchema = Joi.object<typeof PARAMS>(PARAMS)
