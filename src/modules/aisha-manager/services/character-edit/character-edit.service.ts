@@ -161,7 +161,7 @@ export class CharacterEditService {
                   nickNameLabelBefore === nickNameLabelAfter,
               ),
             )
-            .setStyle(ButtonStyle.Primary),
+            .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
             .setCustomId(ComponentCustomIdEnum.SUBMIT_CHARACTER_DELETE)
             .setLabel('Delete ' + selectedCharForEdit.name)

@@ -17,7 +17,7 @@ import {
   MessageFlags,
 } from 'discord.js'
 import { NestEnum } from 'src/shared/enums/nests'
-import { defaultBannerForPanel } from 'src/shared/constants/photo-links'
+import { allValidUTC, defaultBannerForPanel } from 'src/shared/constants/photo-links'
 import { nestInfoMap } from 'src/shared/constants/nest-info-map'
 import { ServerRegionEnum } from 'src/shared/enums/server-region'
 import { defaultUserCreatePartyPanel } from 'src/shared/constants/default-user-create-party-panel'
@@ -35,6 +35,8 @@ import { CharListEntity } from 'src/entities/char-list.entity'
 import { Repository } from 'typeorm'
 import { classesEmojiMap } from 'src/shared/constants/emoji-ids'
 import { CharacterEntity } from 'src/entities/character.entity'
+import { UTC } from 'src/shared/enums/utc'
+import { UserEntity } from 'src/entities/user.entity'
 
 @Injectable()
 export class CreatePartyPanelService {
@@ -43,6 +45,8 @@ export class CreatePartyPanelService {
     private readonly generalComponentsService: GeneralComponentsService,
     @InjectRepository(CharListEntity)
     private readonly charListRepository: Repository<CharListEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
   ) {}
 
   createTimeButton() {
@@ -50,6 +54,33 @@ export class CreatePartyPanelService {
       .setCustomId(ComponentCustomIdEnum.OPEN_MODAL_SET_TIME)
       .setLabel('Set Time')
       .setStyle(ButtonStyle.Secondary)
+  }
+
+  async openModalSetUTC(interaction: ButtonInteraction) {
+    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
+      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
+    )
+
+    const modal = new ModalBuilder()
+      .setCustomId(ComponentCustomIdEnum.SET_UTC_MODAL)
+      .setTitle('Set your UTC like +2, -7, +8:45...')
+
+    const utcInput = new TextInputBuilder()
+      .setCustomId(ComponentCustomIdEnum.SET_UTC_MODAL_INPUT)
+      .setLabel('I will save your UTC for next times <3')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder(`Example "+9:30"`)
+      .setRequired(false)
+
+    if (userData.timeZoneUTC) {
+      utcInput.setValue(userData.timeZoneUTC)
+    }
+
+    modal.addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(utcInput),
+    )
+
+    await interaction.showModal(modal).catch(console.error)
   }
 
   async handleTimeButton(interaction: ButtonInteraction) {
@@ -102,7 +133,7 @@ export class CreatePartyPanelService {
   async createPanel(interaction: ButtonInteraction) {
     const userCharList = await this.charListRepository.findOne({
       where: { user: { discordId: interaction.user.id } },
-      relations: ['characters'],
+      relations: ['characters', 'user'],
     })
 
     if (!userCharList || !userCharList?.characters?.length) {
@@ -121,61 +152,64 @@ export class CreatePartyPanelService {
       ...defaultUserCreatePartyPanel,
       userDiscordId: interaction.user.id,
       characters: userCharList?.characters,
+      timeZoneUTC: userCharList.user.timeZoneUTC,
     })
 
     await interaction.reply({ ...payLoad, flags: MessageFlags.Ephemeral })
   }
 
+  async giveInfoAboutUTC(interaction: ButtonInteraction) {
+    const updatedEmbed = new EmbedBuilder().setColor(0x000000).addFields([
+      {
+        name: '❓ WHAT THE UTC?🤬 For what need?💢💢 ❓',
+        value: `- It's the difference between your time and the time of someone from another country.`,
+      },
+      {
+        name: '',
+        value: `- If you set your **UTC**, we'll save it for next time. After that, you can just enter your local time, and we'll automatically convert it to **SERVER TIME**.`,
+      },
+      {
+        name: '',
+        value: ``,
+      },
+      {
+        name: 'If need, you can check more about UTC on this wiki',
+        value: 'https://en.wikipedia.org/wiki/List_of_UTC_offsets',
+      },
+      {
+        name: '',
+        value: ``,
+      },
+      {
+        name: '**All valid UTC**',
+        value: `⏳ Server time it's +2 ⏳`,
+      },
+    ])
+
+    updatedEmbed.setImage(allValidUTC)
+
+    await interaction.reply({
+      embeds: [updatedEmbed],
+      flags: MessageFlags.Ephemeral,
+    })
+  }
+
+  async moveToStage2CreateParty(interaction: ButtonInteraction) {
+    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
+      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
+    )
+
+    userData.isSecontStageOfCreateParty = true
+
+    const payLoad = await this.mutateInteraction(userData)
+
+    await interaction.update(payLoad)
+  }
+
   async mutateInteraction(userData: UserCreatePartyPanelT) {
     const selectedNest = nestInfoMap[userData.nest as NestEnum]
 
-    const updatedEmbed = new EmbedBuilder()
-      .setColor((selectedNest?.color as ColorResolvable) ?? 0x000000)
-      .setImage(selectedNest?.imgUrl || defaultBannerForPanel)
-
-    if (userData.timeStart && userData.timeEnd) {
-      const { timeStart, timeEnd } = userData
-
-      const formattedStartTimeHourse = DateTime.fromMillis(Number(timeStart))
-        .setZone('Europe/Berlin')
-        .toFormat('HH:mm')
-      const formattedEndTimeHourse = DateTime.fromMillis(Number(timeEnd))
-        .setZone('Europe/Berlin')
-        .toFormat('HH:mm')
-
-      const formattedStartTimeDays = DateTime.fromMillis(Number(timeStart))
-        .setZone('Europe/Berlin')
-        .toFormat('dd/LL')
-      const formattedEndTimeDays = DateTime.fromMillis(Number(timeEnd))
-        .setZone('Europe/Berlin')
-        .toFormat('dd/LL')
-
-      const isSameDays = formattedStartTimeDays === formattedEndTimeDays
-
-      updatedEmbed.setTitle('⏳ **Time Zone** ⏳')
-
-      const unixStart = Math.floor(
-        DateTime.fromMillis(Number(timeStart)).toSeconds(),
-      )
-      const unixEnd = Math.floor(DateTime.fromMillis(Number(timeEnd)).toSeconds())
-
-      if (isSameDays) {
-        updatedEmbed.setDescription(
-          `Server time: **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - ${formattedEndTimeHourse}
-          Your time: <t:${unixStart}:D> <t:${unixStart}:t> - <t:${unixEnd}:t>`,
-        )
-      } else {
-        updatedEmbed.setDescription(
-          `Server-time:
-          **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - start
-          **${formattedEndTimeDays}** | ${formattedEndTimeHourse} - end
-          
-          Your time:
-          <t:${unixStart}:D> <t:${unixStart}:t> - start
-          <t:${unixEnd}:D> <t:${unixEnd}:t> - end`,
-        )
-      }
-    }
+    let updatedEmbed: null | EmbedBuilder = null
 
     await this.redisService.setCache({
       key: RedisCacheKey.USER_PANEL_CREATE_PARTY + userData.userDiscordId,
@@ -187,13 +221,96 @@ export class CreatePartyPanelService {
       !userData.nest || !userData.server || !userData.timeEnd || !userData.timeStart
 
     const isRenderComponentsForEditChar = () => {
-      if (!userData.selectedCharId) {
+      if (
+        !userData.selectedCharId ||
+        !userData.timeZoneUTC ||
+        !userData.isSecontStageOfCreateParty
+      ) {
+        if (userData.timeZoneUTC) {
+          updatedEmbed = new EmbedBuilder()
+            .setColor(0x000000)
+            .setFields([
+              { name: '', value: `🕒  Your UTC: ${userData.timeZoneUTC}` },
+            ])
+        } else {
+          updatedEmbed = new EmbedBuilder()
+            .setColor(0x000000)
+            .setFields([{ name: '', value: `🕒  Default UTC: +2 (Server Time)` }])
+        }
+
         return [
           this.createNicknameSelectMenus(
             userData.selectedCharId,
             userData.characters,
           ),
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId(
+                ComponentCustomIdEnum.OPEN_MODAL_INPUT_UTC_FOR_CREATE_PARTY,
+              )
+              .setLabel('Set UTC')
+              .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+              .setCustomId(ComponentCustomIdEnum.CHECK_MORE_INFO_ABOUT_UTC)
+              .setLabel('Info about UTC')
+              .setStyle(ButtonStyle.Secondary),
+          ),
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId(ComponentCustomIdEnum.CREATE_PARTY_MOVE_TO_STAGE_2)
+              .setLabel('Continue')
+              .setStyle(ButtonStyle.Success)
+              .setDisabled(!userData.selectedCharId),
+          ),
         ]
+      }
+
+      updatedEmbed = new EmbedBuilder()
+        .setColor((selectedNest?.color as ColorResolvable) ?? 0x000000)
+        .setImage(selectedNest?.imgUrl || defaultBannerForPanel)
+
+      if (userData.timeStart && userData.timeEnd) {
+        const { timeStart, timeEnd } = userData
+
+        const formattedStartTimeHourse = DateTime.fromMillis(Number(timeStart))
+          .setZone('Europe/Berlin')
+          .toFormat('HH:mm')
+        const formattedEndTimeHourse = DateTime.fromMillis(Number(timeEnd))
+          .setZone('Europe/Berlin')
+          .toFormat('HH:mm')
+
+        const formattedStartTimeDays = DateTime.fromMillis(Number(timeStart))
+          .setZone('Europe/Berlin')
+          .toFormat('dd/LL')
+        const formattedEndTimeDays = DateTime.fromMillis(Number(timeEnd))
+          .setZone('Europe/Berlin')
+          .toFormat('dd/LL')
+
+        const isSameDays = formattedStartTimeDays === formattedEndTimeDays
+
+        updatedEmbed.setTitle('⏳ **Time Zone** ⏳')
+
+        const unixStart = Math.floor(
+          DateTime.fromMillis(Number(timeStart)).toSeconds(),
+        )
+        const unixEnd = Math.floor(DateTime.fromMillis(Number(timeEnd)).toSeconds())
+
+        if (isSameDays) {
+          updatedEmbed.setDescription(
+            `Server time: **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - ${formattedEndTimeHourse}
+          Your time: <t:${unixStart}:D> <t:${unixStart}:t> - <t:${unixEnd}:t>`,
+          )
+        } else {
+          updatedEmbed.setDescription(
+            `Server-time:
+          **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - start
+          **${formattedEndTimeDays}** | ${formattedEndTimeHourse} - end
+          
+          Your time:
+          <t:${unixStart}:D> <t:${unixStart}:t> - start
+          <t:${unixEnd}:D> <t:${unixEnd}:t> - end`,
+          )
+        }
       }
 
       return [
@@ -207,17 +324,19 @@ export class CreatePartyPanelService {
           this.createTimeButton(),
           this.createClassPriorityLootToggle(userData.classPriorityLoot),
         ),
-        this.generalComponentsService.createActionButtons(
-          ComponentCustomIdEnum.SUBMIT_CREATE_PARTY,
-          'Submit',
-          isDisabledSubmit,
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(ComponentCustomIdEnum.SUBMIT_CREATE_PARTY)
+            .setLabel('Submit')
+            .setDisabled(isDisabledSubmit)
+            .setStyle(ButtonStyle.Success),
         ),
       ]
     }
 
     return {
-      embeds: [updatedEmbed],
       components: isRenderComponentsForEditChar(),
+      ...(updatedEmbed ? { embeds: [updatedEmbed] } : {}),
     }
   }
 
@@ -364,6 +483,10 @@ export class CreatePartyPanelService {
   async handleTimeSubmit(interaction: ModalSubmitInteraction) {
     if (!interaction.isModalSubmit()) return
 
+    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
+      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
+    )
+
     const fromTimeRaw = interaction.fields.getTextInputValue(
       ComponentCustomIdEnum.TIME_START,
     )
@@ -372,10 +495,10 @@ export class CreatePartyPanelService {
     )
 
     const fromTime = DateTime.fromFormat(fromTimeRaw, 'HH:mm dd/LL', {
-      zone: 'Europe/Berlin',
+      zone: userData.timeZoneUTC,
     })
     const toTime = DateTime.fromFormat(toTimeRaw, 'HH:mm dd/LL', {
-      zone: 'Europe/Berlin',
+      zone: userData.timeZoneUTC,
     })
 
     if (!fromTime.isValid || !toTime.isValid) {
@@ -402,7 +525,7 @@ export class CreatePartyPanelService {
 
     if (timeStart < oneHourLater) {
       await this.generalComponentsService.sendErrorMessage(
-        ['🛑 **Error:** Start time must be at least **1 hour** from server time.'],
+        ['🛑 **Error:** Start time must be at least **1 hour** from now.'],
         interaction,
       )
 
@@ -418,12 +541,59 @@ export class CreatePartyPanelService {
       return
     }
 
+    userData.timeEnd = `${timeEnd}`
+    userData.timeStart = `${timeStart}`
+
+    try {
+      await interaction.deferUpdate()
+
+      const payLoad = await this.mutateInteraction(userData)
+
+      await interaction.editReply(payLoad)
+    } catch (error) {
+      console.error('❌ Error updating panel:', error)
+    }
+  }
+
+  async handleUserUTC(interaction: ModalSubmitInteraction) {
+    if (!interaction.isModalSubmit()) return
+
     const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
       RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
     )
 
-    userData.timeEnd = `${timeEnd}`
-    userData.timeStart = `${timeStart}`
+    const userUTC = interaction.fields.getTextInputValue(
+      ComponentCustomIdEnum.SET_UTC_MODAL_INPUT,
+    )
+
+    const isValidUTC = Object.values(UTC).includes(userUTC as UTC)
+
+    if (!isValidUTC && userUTC !== '') {
+      await this.generalComponentsService.sendErrorMessage(
+        [`🛑 **Wrong format:**`, `Must be **+1**, **+3**, **+8:45**, **-12**...`],
+        interaction,
+      )
+
+      return
+    }
+
+    userData.timeZoneUTC = userUTC as UTC
+
+    try {
+      await this.userRepository.update(
+        { discordId: userData.userDiscordId },
+        { timeZoneUTC: userData.timeZoneUTC || null },
+      )
+    } catch {
+      if (!isValidUTC && userUTC !== '') {
+        await this.generalComponentsService.sendErrorMessage(
+          [`🛑 **Error:**`, `Oops, something went wrong, please write to Admin`],
+          interaction,
+        )
+
+        return
+      }
+    }
 
     try {
       await interaction.deferUpdate()

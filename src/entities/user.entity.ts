@@ -10,6 +10,7 @@ import {
 import { CharacterEntity } from './character.entity'
 import { PartyEntity } from './partys.entity'
 import { CharListEntity } from './char-list.entity'
+import { UTC } from 'src/shared/enums/utc'
 
 @Entity({ name: 'users' })
 export class UserEntity {
@@ -40,4 +41,7 @@ export class UserEntity {
 
   @Column({ type: 'varchar', unique: true, nullable: true })
   charlistThreadId: string
+
+  @Column({ type: 'enum', enum: UTC, nullable: true })
+  timeZoneUTC: UTC
 }

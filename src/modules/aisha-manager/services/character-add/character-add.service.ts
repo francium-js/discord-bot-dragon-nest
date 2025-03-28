@@ -101,10 +101,12 @@ export class CharacterAddService {
         userData.generalClass,
         PanelEnum.ADD_CHAR,
       ),
-      this.generalComponentsService.createActionButtons(
-        ComponentCustomIdEnum.SUBMIT_CHARACTER_ADD,
-        'Create',
-        Boolean(!userData.class),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(ComponentCustomIdEnum.SUBMIT_CHARACTER_ADD)
+          .setLabel('Create')
+          .setDisabled(Boolean(!userData.class))
+          .setStyle(ButtonStyle.Success),
       ),
     ]
 

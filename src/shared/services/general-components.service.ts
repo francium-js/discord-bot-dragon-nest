@@ -23,16 +23,6 @@ Injectable()
 class GeneralComponentsService {
   constructor() {}
 
-  createActionButtons(customId: string, text: string, isDisabled: boolean = false) {
-    return new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(customId)
-        .setLabel(text)
-        .setDisabled(isDisabled)
-        .setStyle(ButtonStyle.Primary),
-    )
-  }
-
   async sendErrorMessage(
     errors: string[],
     interaction: ModalSubmitInteraction | ButtonInteraction,

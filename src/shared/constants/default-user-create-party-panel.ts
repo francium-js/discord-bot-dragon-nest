@@ -10,4 +10,5 @@ export const defaultUserCreatePartyPanel: UserCreatePartyPanelT = {
   userDiscordId: null!,
   selectedCharId: null!,
   characters: [],
+  isSecontStageOfCreateParty: false,
 }

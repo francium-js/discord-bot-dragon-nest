@@ -17,3 +17,6 @@ export const rdm =
 
 export const defaultBannerForPanel =
   'https://www.dropbox.com/scl/fi/10z8o0g13cn2oiznljsmc/default.png?rlkey=v5s97bkh43h9h0dwtbuagc59y&st=n2nbk7u9&dl=1'
+
+export const allValidUTC =
+  'https://www.dropbox.com/scl/fi/nolbtics3d7rru8owse4i/all_valid_utc.png?rlkey=l04qhvb927mba1hv1chs6cvhr&st=jajrahul&dl=1'

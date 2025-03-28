@@ -50,6 +50,10 @@ export class RubinartManagerService implements OnModuleInit {
         if (modalInteraction.customId === ComponentCustomIdEnum.TIME_MODAL) {
           await this.createPartyPanelService.handleTimeSubmit(modalInteraction)
         }
+
+        if (modalInteraction.customId === ComponentCustomIdEnum.SET_UTC_MODAL) {
+          await this.createPartyPanelService.handleUserUTC(modalInteraction)
+        }
       }
 
       if (interaction.isButton()) {
@@ -70,6 +74,18 @@ export class RubinartManagerService implements OnModuleInit {
 
           case ComponentCustomIdEnum.OPEN_MODAL_SET_TIME:
             await this.createPartyPanelService.handleTimeButton(interaction)
+            break
+
+          case ComponentCustomIdEnum.OPEN_MODAL_INPUT_UTC_FOR_CREATE_PARTY:
+            await this.createPartyPanelService.openModalSetUTC(interaction)
+            break
+
+          case ComponentCustomIdEnum.CHECK_MORE_INFO_ABOUT_UTC:
+            await this.createPartyPanelService.giveInfoAboutUTC(interaction)
+            break
+
+          case ComponentCustomIdEnum.CREATE_PARTY_MOVE_TO_STAGE_2:
+            await this.createPartyPanelService.moveToStage2CreateParty(interaction)
             break
 
           case ComponentCustomIdEnum.CLASS_PRIORITY_LOOT_TOGGLE:
