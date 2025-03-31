@@ -3,7 +3,6 @@ import {
   PrimaryGeneratedColumn,
   Column,
   OneToMany,
-  ManyToOne,
   OneToOne,
   JoinColumn,
 } from 'typeorm'
@@ -23,14 +22,8 @@ export class UserEntity {
   @OneToMany(() => CharacterEntity, character => character.user, { cascade: true })
   characters: CharacterEntity[]
 
-  @OneToMany(() => PartyEntity, party => party.createdBy)
-  createdPartys: PartyEntity[]
-
-  @ManyToOne(() => PartyEntity, party => party.members, {
-    nullable: true,
-    onDelete: 'SET NULL',
-  })
-  joinedParty: PartyEntity
+  @OneToMany(() => PartyEntity, party => party.leader)
+  partys: PartyEntity[]
 
   @OneToOne(
     () => CharListEntity,

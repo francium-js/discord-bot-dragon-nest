@@ -11,7 +11,6 @@ import {
   PartialUser,
   Partials,
 } from 'discord.js'
-import { ConfigService } from '@nestjs/config'
 import { nestInfoMap } from 'src/shared/constants/nest-info-map'
 import { NestEnum } from 'src/shared/enums/nests'
 import { roleIdsMap } from 'src/shared/constants/role-ids'
@@ -24,7 +23,7 @@ export class KarahanManagerService implements OnModuleInit {
   private regionServersRoles: Record<string, string>
   private nestRoles: Record<string, string>
 
-  constructor(private configService: ConfigService) {
+  constructor() {
     this.client = new Client({
       intents: [
         GatewayIntentBits.Guilds,

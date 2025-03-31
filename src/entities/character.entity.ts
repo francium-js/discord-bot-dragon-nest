@@ -4,6 +4,7 @@ import { CharacterClassEnum } from '../shared/enums/character-class'
 import { ElementEnum } from '../shared/enums/element'
 import { CharListEntity } from './char-list.entity'
 import { GeneralCharacterClassEnum } from 'src/shared/enums/general-character-class'
+import { PartyEntity } from './partys.entity'
 
 @Entity({ name: 'characters' })
 export class CharacterEntity {
@@ -45,4 +46,10 @@ export class CharacterEntity {
     onDelete: 'CASCADE',
   })
   charList: CharListEntity
+
+  @ManyToOne(() => PartyEntity, party => party.members, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  joinedParty: PartyEntity
 }

@@ -15,9 +15,14 @@ import {
   TextInputBuilder,
   ModalSubmitInteraction,
   MessageFlags,
+  TextChannel,
+  ChannelType,
 } from 'discord.js'
 import { NestEnum } from 'src/shared/enums/nests'
-import { allValidUTC, defaultBannerForPanel } from 'src/shared/constants/photo-links'
+import {
+  allValidUTCPng,
+  defaultBannerForPanelPng,
+} from 'src/shared/constants/photo-links'
 import { nestInfoMap } from 'src/shared/constants/nest-info-map'
 import { ServerRegionEnum } from 'src/shared/enums/server-region'
 import { defaultUserCreatePartyPanel } from 'src/shared/constants/default-user-create-party-panel'
@@ -28,7 +33,7 @@ import { RedisCacheKey } from 'src/shared/enums/redis-cache-key'
 import { RedisCacheDuration } from 'src/shared/enums/redis-cache-duration'
 import { DateTime } from 'luxon'
 import { UserCreatePartyPanelT } from 'src/shared/types/user-create-party-panel'
-import GeneralComponentsService from 'src/shared/services/general-components.service'
+import { GeneralComponentsService } from 'src/shared/services/general-components/general-components.service'
 import { PanelEnum } from 'src/shared/enums/panel'
 import { InjectRepository } from '@nestjs/typeorm'
 import { CharListEntity } from 'src/entities/char-list.entity'
@@ -37,29 +42,61 @@ import { classesEmojiMap } from 'src/shared/constants/emoji-ids'
 import { CharacterEntity } from 'src/entities/character.entity'
 import { UTC } from 'src/shared/enums/utc'
 import { UserEntity } from 'src/entities/user.entity'
+import { PartyEntity } from 'src/entities/partys.entity'
+import {
+  CreatePartyChannelT,
+  GetPartyFormCacheDataT,
+  HandleCreatePartyT,
+} from './types'
+import { PartComponentsService } from 'src/shared/services/party-components/party-components.service'
 
 @Injectable()
 export class CreatePartyPanelService {
+  private partyListDiscordChalledId: string = process.env.PARTY_LIST_CHANNEL_ID
+
   constructor(
     private readonly redisService: RedisService,
     private readonly generalComponentsService: GeneralComponentsService,
+    private readonly partComponentsService: PartComponentsService,
     @InjectRepository(CharListEntity)
     private readonly charListRepository: Repository<CharListEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
+    @InjectRepository(PartyEntity)
+    private readonly partyRepository: Repository<PartyEntity>,
+    @InjectRepository(CharacterEntity)
+    private readonly characterRepository: Repository<CharacterEntity>,
   ) {}
 
-  createTimeButton() {
-    return new ButtonBuilder()
-      .setCustomId(ComponentCustomIdEnum.OPEN_MODAL_SET_TIME)
-      .setLabel('Set Time')
-      .setStyle(ButtonStyle.Secondary)
+  async getPartyFormCacheData({
+    interaction,
+    userDiscordId,
+  }: GetPartyFormCacheDataT): Promise<UserCreatePartyPanelT> {
+    const formData = await this.redisService.getCache<UserCreatePartyPanelT>(
+      RedisCacheKey.USER_PANEL_CREATE_PARTY + userDiscordId,
+    )
+
+    if (!formData) {
+      if (interaction) {
+        await this.generalComponentsService.sendErrorMessage(
+          [`🛑 **Error:**`, `Oops, something went wrong, try again.`],
+          interaction,
+        )
+      }
+
+      return
+    }
+
+    return formData
   }
 
   async openModalSetUTC(interaction: ButtonInteraction) {
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
 
     const modal = new ModalBuilder()
       .setCustomId(ComponentCustomIdEnum.SET_UTC_MODAL)
@@ -72,8 +109,8 @@ export class CreatePartyPanelService {
       .setPlaceholder(`Example "+9:30"`)
       .setRequired(false)
 
-    if (userData.timeZoneUTC) {
-      utcInput.setValue(userData.timeZoneUTC)
+    if (partyFormData.timeZoneUTC) {
+      utcInput.setValue(partyFormData.timeZoneUTC)
     }
 
     modal.addComponents(
@@ -83,25 +120,35 @@ export class CreatePartyPanelService {
     await interaction.showModal(modal).catch(console.error)
   }
 
-  async handleTimeButton(interaction: ButtonInteraction) {
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+  async openModalTimeSet(interaction: ButtonInteraction) {
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
 
-    const { timeStart, timeEnd } = userData
+    if (!partyFormData) return
 
-    const formattedStartTime = DateTime.fromMillis(Number(timeStart)).toFormat(
-      'HH:mm dd/LL',
-    )
-    const formattedEndTime = DateTime.fromMillis(Number(timeEnd)).toFormat(
-      'HH:mm dd/LL',
-    )
+    const zone = 'UTC' + (partyFormData.timeZoneUTC || '+2')
 
-    const datePlus2 = DateTime.now().plus({ days: 2 }).toFormat('dd/LL')
+    const { timeStart, timeEnd } = partyFormData
+
+    const formattedStartTime = DateTime.fromMillis(Number(timeStart))
+      .setZone(zone)
+      .toFormat('HH:mm dd/LL')
+    const formattedEndTime = DateTime.fromMillis(Number(timeEnd))
+      .setZone(zone)
+      .toFormat('HH:mm dd/LL')
+
+    const datePlus2 = DateTime.now()
+      .setZone(zone)
+      .plus({ days: 3 })
+      .toFormat('dd/LL')
 
     const modal = new ModalBuilder()
       .setCustomId(ComponentCustomIdEnum.TIME_MODAL)
-      .setTitle('Set diapazon time (Server time)')
+      .setTitle(
+        `Set diapazon time ${partyFormData.timeZoneUTC ? '' : '(Server time)'}`,
+      )
 
     const fromTimeInput = new TextInputBuilder()
       .setCustomId(ComponentCustomIdEnum.TIME_START)
@@ -130,6 +177,36 @@ export class CreatePartyPanelService {
     await interaction.showModal(modal).catch(console.error)
   }
 
+  async openModalSetDescription(interaction: ButtonInteraction) {
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
+
+    const modal = new ModalBuilder()
+      .setCustomId(ComponentCustomIdEnum.PARTY_DESCRIPTION_MODAL)
+      .setTitle(`Set party description`)
+
+    const input = new TextInputBuilder()
+      .setCustomId(ComponentCustomIdEnum.PARTY_DESCRIPTION_INPUT)
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(false)
+      .setLabel('Description')
+      .setMaxLength(400)
+
+    if (partyFormData.description) {
+      input.setValue(partyFormData.description)
+    }
+
+    modal.addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(input),
+    )
+
+    await interaction.showModal(modal).catch(console.error)
+  }
+
   async createPanel(interaction: ButtonInteraction) {
     const userCharList = await this.charListRepository.findOne({
       where: { user: { discordId: interaction.user.id } },
@@ -141,6 +218,22 @@ export class CreatePartyPanelService {
         [
           'You have not characters',
           `You can create character here ${process.env.DISCORD_GUILD_LINK}${process.env.CHARS_MANAGER_CHANNEL_ID}`,
+        ],
+        interaction,
+      )
+
+      return
+    }
+
+    const allPartyOfPlayer = await this.partyRepository.find({
+      where: { leader: { discordId: interaction.user.id } },
+    })
+
+    if (allPartyOfPlayer.length >= 5) {
+      await this.generalComponentsService.sendErrorMessage(
+        [
+          `You can't have more than 5 parties at the same time`,
+          `To create a new one, delete an existing party or wait until one expires`,
         ],
         interaction,
       )
@@ -182,11 +275,11 @@ export class CreatePartyPanelService {
       },
       {
         name: '**All valid UTC**',
-        value: `⏳ Server time it's +2 ⏳`,
+        value: `⏳ Server time is +1 ⏳`,
       },
     ])
 
-    updatedEmbed.setImage(allValidUTC)
+    updatedEmbed.setImage(allValidUTCPng)
 
     await interaction.reply({
       embeds: [updatedEmbed],
@@ -195,60 +288,70 @@ export class CreatePartyPanelService {
   }
 
   async moveToStage2CreateParty(interaction: ButtonInteraction) {
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
 
-    userData.isSecontStageOfCreateParty = true
+    if (!partyFormData) return
 
-    const payLoad = await this.mutateInteraction(userData)
+    partyFormData.isSecontStageOfCreateParty = true
+
+    const payLoad = await this.mutateInteraction(partyFormData)
 
     await interaction.update(payLoad)
   }
 
-  async mutateInteraction(userData: UserCreatePartyPanelT) {
-    const selectedNest = nestInfoMap[userData.nest as NestEnum]
+  async mutateInteraction(partyFormData: UserCreatePartyPanelT) {
+    const selectedNest = nestInfoMap[partyFormData.nest]
 
-    let updatedEmbed: null | EmbedBuilder = null
+    const embeds = []
+
+    const updatedEmbed = new EmbedBuilder()
+    const descriptionEmbed = new EmbedBuilder()
 
     await this.redisService.setCache({
-      key: RedisCacheKey.USER_PANEL_CREATE_PARTY + userData.userDiscordId,
-      value: userData,
+      key: RedisCacheKey.USER_PANEL_CREATE_PARTY + partyFormData.userDiscordId,
+      value: partyFormData,
       ttl: RedisCacheDuration.USER_PANEL_CREATE_PARTY,
     })
 
     const isDisabledSubmit =
-      !userData.nest || !userData.server || !userData.timeEnd || !userData.timeStart
+      !partyFormData.nest ||
+      !partyFormData.serverRegion ||
+      !partyFormData.timeEnd ||
+      !partyFormData.timeStart
 
     const isRenderComponentsForEditChar = () => {
       if (
-        !userData.selectedCharId ||
-        !userData.timeZoneUTC ||
-        !userData.isSecontStageOfCreateParty
+        !partyFormData.selectedCharId ||
+        !partyFormData.isSecontStageOfCreateParty
       ) {
-        if (userData.timeZoneUTC) {
-          updatedEmbed = new EmbedBuilder()
+        if (partyFormData.timeZoneUTC) {
+          embeds.push(updatedEmbed)
+
+          updatedEmbed
             .setColor(0x000000)
             .setFields([
-              { name: '', value: `🕒  Your UTC: ${userData.timeZoneUTC}` },
+              { name: '', value: `🕒  Your UTC: ${partyFormData.timeZoneUTC}` },
             ])
         } else {
-          updatedEmbed = new EmbedBuilder()
+          updatedEmbed
             .setColor(0x000000)
-            .setFields([{ name: '', value: `🕒  Default UTC: +2 (Server Time)` }])
+            .setFields([{ name: '', value: `🕒  Default UTC: +1 (Server Time)` }])
         }
 
         return [
           this.createNicknameSelectMenus(
-            userData.selectedCharId,
-            userData.characters,
+            partyFormData.selectedCharId,
+            partyFormData.characters,
           ),
           new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder()
               .setCustomId(
                 ComponentCustomIdEnum.OPEN_MODAL_INPUT_UTC_FOR_CREATE_PARTY,
               )
-              .setLabel('Set UTC')
+              .setLabel(`${partyFormData.timeZoneUTC ? 'Update' : 'Set'} UTC`)
               .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
               .setCustomId(ComponentCustomIdEnum.CHECK_MORE_INFO_ABOUT_UTC)
@@ -260,69 +363,64 @@ export class CreatePartyPanelService {
               .setCustomId(ComponentCustomIdEnum.CREATE_PARTY_MOVE_TO_STAGE_2)
               .setLabel('Continue')
               .setStyle(ButtonStyle.Success)
-              .setDisabled(!userData.selectedCharId),
+              .setDisabled(!partyFormData.selectedCharId),
           ),
         ]
       }
 
-      updatedEmbed = new EmbedBuilder()
+      updatedEmbed
         .setColor((selectedNest?.color as ColorResolvable) ?? 0x000000)
-        .setImage(selectedNest?.imgUrl || defaultBannerForPanel)
+        .setImage(selectedNest?.imgUrl || defaultBannerForPanelPng)
 
-      if (userData.timeStart && userData.timeEnd) {
-        const { timeStart, timeEnd } = userData
+      if (partyFormData.timeStart && partyFormData.timeEnd) {
+        const { timeStart, timeEnd } = partyFormData
 
-        const formattedStartTimeHourse = DateTime.fromMillis(Number(timeStart))
-          .setZone('Europe/Berlin')
-          .toFormat('HH:mm')
-        const formattedEndTimeHourse = DateTime.fromMillis(Number(timeEnd))
-          .setZone('Europe/Berlin')
-          .toFormat('HH:mm')
+        this.partComponentsService.addPartyTimeFields({
+          embed: updatedEmbed,
+          timeStart,
+          timeEnd,
+        })
+      }
 
-        const formattedStartTimeDays = DateTime.fromMillis(Number(timeStart))
-          .setZone('Europe/Berlin')
-          .toFormat('dd/LL')
-        const formattedEndTimeDays = DateTime.fromMillis(Number(timeEnd))
-          .setZone('Europe/Berlin')
-          .toFormat('dd/LL')
+      embeds.push(updatedEmbed)
 
-        const isSameDays = formattedStartTimeDays === formattedEndTimeDays
+      if (partyFormData.description) {
+        this.partComponentsService.addPartyDescription({
+          embed: descriptionEmbed,
+          description: partyFormData.description,
+        })
 
-        updatedEmbed.setTitle('⏳ **Time Zone** ⏳')
-
-        const unixStart = Math.floor(
-          DateTime.fromMillis(Number(timeStart)).toSeconds(),
-        )
-        const unixEnd = Math.floor(DateTime.fromMillis(Number(timeEnd)).toSeconds())
-
-        if (isSameDays) {
-          updatedEmbed.setDescription(
-            `Server time: **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - ${formattedEndTimeHourse}
-          Your time: <t:${unixStart}:D> <t:${unixStart}:t> - <t:${unixEnd}:t>`,
-          )
-        } else {
-          updatedEmbed.setDescription(
-            `Server-time:
-          **${formattedStartTimeDays}** | ${formattedStartTimeHourse} - start
-          **${formattedEndTimeDays}** | ${formattedEndTimeHourse} - end
-          
-          Your time:
-          <t:${unixStart}:D> <t:${unixStart}:t> - start
-          <t:${unixEnd}:D> <t:${unixEnd}:t> - end`,
-          )
-        }
+        embeds.push(descriptionEmbed)
       }
 
       return [
-        this.createServerSelectMenus(userData.server as ServerRegionEnum),
-        this.createNestSelectMenus(userData.nest as NestEnum),
+        this.createServerSelectMenus(partyFormData.serverRegion),
+        this.createNestSelectMenus(partyFormData.nest),
         this.generalComponentsService.createElementButtons(
           PanelEnum.CREATE_PARTY,
-          userData.elements,
+          partyFormData.elements,
         ),
         new ActionRowBuilder<ButtonBuilder>().addComponents(
-          this.createTimeButton(),
-          this.createClassPriorityLootToggle(userData.classPriorityLoot),
+          new ButtonBuilder()
+            .setCustomId(ComponentCustomIdEnum.OPEN_MODAL_SET_TIME)
+            .setLabel('Set Time')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId(ComponentCustomIdEnum.OPEN_MODAL_PARTY_DESCRIPTION)
+            .setLabel('Description')
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId(ComponentCustomIdEnum.CLASS_PRIORITY_LOOT_TOGGLE)
+            .setLabel(
+              partyFormData.classPriorityLoot
+                ? 'Class Priority Loot ACTIVATED '
+                : 'Class Priority Loot DISABLED',
+            )
+            .setStyle(
+              partyFormData.classPriorityLoot
+                ? ButtonStyle.Success
+                : ButtonStyle.Danger,
+            ),
         ),
         new ActionRowBuilder<ButtonBuilder>().addComponents(
           new ButtonBuilder()
@@ -336,14 +434,14 @@ export class CreatePartyPanelService {
 
     return {
       components: isRenderComponentsForEditChar(),
-      ...(updatedEmbed ? { embeds: [updatedEmbed] } : {}),
+      ...(embeds.length ? { embeds } : {}),
     }
   }
 
   createNicknameSelectMenus(selectedCharId: number, characters?: CharacterEntity[]) {
     const serverSelect = new StringSelectMenuBuilder()
       .setCustomId(ComponentCustomIdEnum.SELECT_CHARACTER_FOR_CREATE_PARTY)
-      .setPlaceholder('Select your char')
+      .setPlaceholder('Select your character')
       .addOptions(
         ...characters.map(char =>
           new StringSelectMenuOptionBuilder()
@@ -392,13 +490,16 @@ export class CreatePartyPanelService {
   }
 
   async handleToggleButton(interaction: ButtonInteraction) {
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
 
-    userData.classPriorityLoot = !userData.classPriorityLoot
+    if (!partyFormData) return
 
-    const payLoad = await this.mutateInteraction(userData)
+    partyFormData.classPriorityLoot = !partyFormData.classPriorityLoot
+
+    const payLoad = await this.mutateInteraction(partyFormData)
 
     await interaction.update(payLoad)
   }
@@ -422,33 +523,27 @@ export class CreatePartyPanelService {
     return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(nestSelect)
   }
 
-  createClassPriorityLootToggle(status: boolean = true) {
-    return new ButtonBuilder()
-      .setCustomId(ComponentCustomIdEnum.CLASS_PRIORITY_LOOT_TOGGLE)
-      .setLabel(
-        status ? 'Class Priority Loot ACTIVATED ' : 'Class Priority Loot DISABLED',
-      )
-      .setStyle(status ? ButtonStyle.Success : ButtonStyle.Danger)
-  }
-
   async handleElementSelection(interaction: Interaction) {
     if (!interaction.isButton()) return
+
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
 
     const element = Object.values(ElementEnum).find(element =>
       interaction.customId.toLocaleLowerCase().includes(element.toLocaleLowerCase()),
     )
 
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
-
-    if (userData.elements.includes(element)) {
-      userData.elements = userData.elements.filter(e => e !== element)
+    if (partyFormData.elements.includes(element)) {
+      partyFormData.elements = partyFormData.elements.filter(e => e !== element)
     } else {
-      userData.elements.push(element)
+      partyFormData.elements.push(element)
     }
 
-    const payLoad = await this.mutateInteraction(userData)
+    const payLoad = await this.mutateInteraction(partyFormData)
 
     await interaction.update(payLoad)
   }
@@ -456,26 +551,28 @@ export class CreatePartyPanelService {
   async handleSelectMenu(interaction: StringSelectMenuInteraction) {
     if (!interaction.isStringSelectMenu()) return
 
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    const partyFormData = await this.getPartyFormCacheData({
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
 
     if (
       interaction.customId ===
       ComponentCustomIdEnum.SELECT_CHARACTER_FOR_CREATE_PARTY
     ) {
-      userData.selectedCharId = Number(interaction.values[0])
+      partyFormData.selectedCharId = Number(interaction.values[0])
     }
 
     if (interaction.customId === ComponentCustomIdEnum.SELECT_NEST) {
-      userData.nest = interaction.values[0] as NestEnum
+      partyFormData.nest = interaction.values[0] as NestEnum
     }
 
     if (interaction.customId === ComponentCustomIdEnum.SELECT_SERVER) {
-      userData.server = interaction.values[0] as ServerRegionEnum
+      partyFormData.serverRegion = interaction.values[0] as ServerRegionEnum
     }
 
-    const payLoad = await this.mutateInteraction(userData)
+    const payLoad = await this.mutateInteraction(partyFormData)
 
     await interaction.update(payLoad)
   }
@@ -483,9 +580,11 @@ export class CreatePartyPanelService {
   async handleTimeSubmit(interaction: ModalSubmitInteraction) {
     if (!interaction.isModalSubmit()) return
 
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    const partyFormData = await this.getPartyFormCacheData({
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
 
     const fromTimeRaw = interaction.fields.getTextInputValue(
       ComponentCustomIdEnum.TIME_START,
@@ -493,12 +592,13 @@ export class CreatePartyPanelService {
     const toTimeRaw = interaction.fields.getTextInputValue(
       ComponentCustomIdEnum.TIME_END,
     )
+    const zone = 'UTC' + (partyFormData.timeZoneUTC || '+2')
 
     const fromTime = DateTime.fromFormat(fromTimeRaw, 'HH:mm dd/LL', {
-      zone: userData.timeZoneUTC,
+      zone,
     })
     const toTime = DateTime.fromFormat(toTimeRaw, 'HH:mm dd/LL', {
-      zone: userData.timeZoneUTC,
+      zone,
     })
 
     if (!fromTime.isValid || !toTime.isValid) {
@@ -541,13 +641,13 @@ export class CreatePartyPanelService {
       return
     }
 
-    userData.timeEnd = `${timeEnd}`
-    userData.timeStart = `${timeStart}`
+    partyFormData.timeEnd = `${timeEnd}`
+    partyFormData.timeStart = `${timeStart}`
 
     try {
       await interaction.deferUpdate()
 
-      const payLoad = await this.mutateInteraction(userData)
+      const payLoad = await this.mutateInteraction(partyFormData)
 
       await interaction.editReply(payLoad)
     } catch (error) {
@@ -558,9 +658,12 @@ export class CreatePartyPanelService {
   async handleUserUTC(interaction: ModalSubmitInteraction) {
     if (!interaction.isModalSubmit()) return
 
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
 
     const userUTC = interaction.fields.getTextInputValue(
       ComponentCustomIdEnum.SET_UTC_MODAL_INPUT,
@@ -577,28 +680,26 @@ export class CreatePartyPanelService {
       return
     }
 
-    userData.timeZoneUTC = userUTC as UTC
+    partyFormData.timeZoneUTC = userUTC as UTC
 
     try {
       await this.userRepository.update(
-        { discordId: userData.userDiscordId },
-        { timeZoneUTC: userData.timeZoneUTC || null },
+        { discordId: partyFormData.userDiscordId },
+        { timeZoneUTC: partyFormData.timeZoneUTC || null },
       )
     } catch {
-      if (!isValidUTC && userUTC !== '') {
-        await this.generalComponentsService.sendErrorMessage(
-          [`🛑 **Error:**`, `Oops, something went wrong, please write to Admin`],
-          interaction,
-        )
+      await this.generalComponentsService.sendErrorMessage(
+        [`🛑 **Error:**`, `Oops, something went wrong, please write to Admin`],
+        interaction,
+      )
 
-        return
-      }
+      return
     }
 
     try {
       await interaction.deferUpdate()
 
-      const payLoad = await this.mutateInteraction(userData)
+      const payLoad = await this.mutateInteraction(partyFormData)
 
       await interaction.editReply(payLoad)
     } catch (error) {
@@ -606,46 +707,203 @@ export class CreatePartyPanelService {
     }
   }
 
-  async handleCreateParty(interaction: ButtonInteraction) {
-    // const userDiscordId = interaction.user.id
-    // const userData = await this.redisService.getCache<UserCreatePartyPanelT>(RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id)
+  async handlePartyDescription(interaction: ModalSubmitInteraction) {
+    if (!interaction.isModalSubmit()) return
 
-    const userData = await this.redisService.getCache<UserCreatePartyPanelT>(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
+
+    const partyDascription = interaction.fields.getTextInputValue(
+      ComponentCustomIdEnum.PARTY_DESCRIPTION_INPUT,
     )
 
-    await this.redisService.deleteCache(
-      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
-    )
+    partyFormData.description = partyDascription || ''
 
-    const linkButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setLabel(`Link to your party`)
-        .setStyle(ButtonStyle.Link)
-        .setURL(
-          `${process.env.DISCORD_GUILD_LINK}${process.env.PARTY_LIST_CHANNEL_ID}`,
-        ),
-      new ButtonBuilder()
-        .setLabel(`Link to DS to your private party branch`)
-        .setStyle(ButtonStyle.Link)
-        .setURL(
-          `${process.env.DISCORD_GUILD_LINK}${process.env.PARTY_LIST_CHANNEL_ID}`,
-        ),
-    )
+    try {
+      await interaction.deferUpdate()
 
-    const nestInfo = nestInfoMap[userData.nest as NestEnum]
+      const payLoad = await this.mutateInteraction(partyFormData)
+
+      await interaction.editReply(payLoad)
+    } catch (error) {
+      console.error('❌ Error updating panel:', error)
+    }
+  }
+
+  async handleCreateParty({ interaction, client }: HandleCreatePartyT) {
+    await interaction.deferUpdate()
+
+    const partyFormData = await this.getPartyFormCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!partyFormData) return
+
+    const charListChannel = (await client.channels.fetch(
+      this.partyListDiscordChalledId,
+    )) as TextChannel
+
+    const newPartyListMessage = await charListChannel.send({
+      content: `Creating new party..`,
+    })
+
+    const { partyCategoryId, privatePartyTextChannelId } =
+      await this.createPrivatePartyChannel({
+        partyFormData,
+        partyNumber: 234,
+        client,
+      })
+
+    const nestInfo = nestInfoMap[partyFormData.nest]
+
+    await newPartyListMessage.startThread({
+      name: `Party info`,
+      autoArchiveDuration: 60,
+      reason: nestInfo.name,
+    })
+
+    const user = await this.userRepository.findOne({
+      where: { discordId: partyFormData.userDiscordId },
+    })
+
+    const userCharacter = await this.characterRepository.findOne({
+      where: { id: partyFormData.selectedCharId },
+    })
+
+    const userParty = this.partyRepository.create({
+      leader: user,
+      members: [userCharacter],
+      element: partyFormData.elements,
+      classPriorityLoot: partyFormData.classPriorityLoot,
+      timeStart: partyFormData.timeStart,
+      timeEnd: partyFormData.timeEnd,
+      serverRegion: partyFormData.serverRegion,
+      discordMessageId: newPartyListMessage.id,
+      partyCategoryId: partyCategoryId,
+    })
+
+    await this.partyRepository.save(userParty)
+
+    const { components, embeds } = this.partComponentsService.mutatePartyComponent({
+      ...partyFormData,
+      leader: userCharacter,
+      members: [userCharacter],
+    })
+
+    await newPartyListMessage.edit({
+      content: '',
+      components,
+      embeds,
+    })
+
+    const linkButtonRow = [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setLabel(`Link to your party in party-list`)
+          .setStyle(ButtonStyle.Link)
+          .setURL(
+            `${process.env.DISCORD_GUILD_LINK}${process.env.PARTY_LIST_CHANNEL_ID}/${newPartyListMessage.id}`,
+          ),
+      ),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setLabel(`Link to your PRIVATE party category`)
+          .setStyle(ButtonStyle.Link)
+          .setURL(`${process.env.DISCORD_GUILD_LINK}${privatePartyTextChannelId}`),
+      ),
+    ]
 
     const updatedEmbed = new EmbedBuilder().setColor(0x1deb0c).addFields(
-      { name: '', value: `<:${userData.nest}:${nestInfo.emoji}> ${nestInfo.name}` },
+      {
+        name: '',
+        value: `<:${partyFormData.nest}:${nestInfo.emoji}> ${nestInfo.name}`,
+      },
       {
         name: '',
         value: '✅ Party created',
       },
     )
 
-    await interaction.update({
+    await interaction.editReply({
       embeds: [updatedEmbed],
-      components: [linkButtonRow],
+      components: [...linkButtonRow],
     })
+
+    await this.redisService.deleteCache(
+      RedisCacheKey.USER_PANEL_CREATE_PARTY + interaction.user.id,
+    )
+  }
+
+  async createPrivatePartyChannel({
+    client,
+    partyFormData,
+    partyNumber,
+  }: CreatePartyChannelT): Promise<{
+    partyCategoryId: string
+    privatePartyTextChannelId: string
+  }> {
+    const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID)
+
+    const category = await guild.channels.create({
+      name: `Party-${partyNumber}|${partyFormData.nest}`,
+      type: ChannelType.GuildCategory,
+      permissionOverwrites: [
+        {
+          id: guild.roles.everyone,
+          deny: ['ViewChannel'],
+        },
+        {
+          id: partyFormData.userDiscordId,
+          allow: ['ViewChannel'],
+        },
+      ],
+    })
+
+    const textChannels = ['🔧settings', '📩requests', '💬chat']
+
+    let privatePartyTextChannelId = ''
+
+    for (const name of textChannels) {
+      const textBranch = await guild.channels.create({
+        name,
+        type: ChannelType.GuildText,
+        parent: category,
+        permissionOverwrites: category.permissionOverwrites.cache.map(p => p),
+      })
+
+      if (name === textChannels[2]) {
+        privatePartyTextChannelId = textBranch.id
+      }
+    }
+
+    await guild.channels.create({
+      name: '📢raids',
+      type: ChannelType.GuildVoice,
+      parent: category,
+      permissionOverwrites: category.permissionOverwrites.cache.map(p => p),
+    })
+
+    await guild.channels.create({
+      name: '👥',
+      type: ChannelType.GuildVoice,
+      parent: category,
+      userLimit: 2,
+      permissionOverwrites: category.permissionOverwrites.cache.map(p => p),
+    })
+
+    await guild.channels.create({
+      name: '👥',
+      type: ChannelType.GuildVoice,
+      parent: category,
+      userLimit: 2,
+      permissionOverwrites: category.permissionOverwrites.cache.map(p => p),
+    })
+
+    return { partyCategoryId: category.id, privatePartyTextChannelId }
   }
 }

@@ -20,7 +20,7 @@ import { RedisCacheKey } from 'src/shared/enums/redis-cache-key'
 import { RedisService } from 'src/shared/redis/redis.service'
 import { UserCharacterAddT } from 'src/shared/types/user-characters-add'
 import { ElementEnum } from 'src/shared/enums/element'
-import GeneralComponentsService from 'src/shared/services/general-components.service'
+import { GeneralComponentsService } from 'src/shared/services/general-components/general-components.service'
 import { defaultUserCharacterAdd } from 'src/shared/constants/default-user-character-add'
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
 import { classesEmojiMap, elementEmojiMap } from 'src/shared/constants/emoji-ids'
@@ -33,6 +33,8 @@ import { Repository } from 'typeorm'
 import { CharacterEntity } from 'src/entities/character.entity'
 import { CharListEntity } from 'src/entities/char-list.entity'
 import { PanelEnum } from 'src/shared/enums/panel'
+import { GetCharacterCacheDataT } from './types'
+import { CharListComponentsService } from 'src/shared/services/char-list-components/char-list-components.service'
 
 @Injectable()
 export class CharacterAddService {
@@ -41,6 +43,7 @@ export class CharacterAddService {
   constructor(
     private readonly redisService: RedisService,
     private readonly generalComponentsService: GeneralComponentsService,
+    private readonly charListComponentsService: CharListComponentsService,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(CharacterEntity)
@@ -48,6 +51,28 @@ export class CharacterAddService {
     @InjectRepository(CharListEntity)
     private readonly charListRepository: Repository<CharListEntity>,
   ) {}
+
+  async getCharacterCacheData({
+    interaction,
+    userDiscordId,
+  }: GetCharacterCacheDataT): Promise<UserCharacterAddT> {
+    const userCharacterData = await this.redisService.getCache<UserCharacterAddT>(
+      RedisCacheKey.USER_PANEL_CHARACTER_ADD + userDiscordId,
+    )
+
+    if (!userCharacterData) {
+      if (interaction) {
+        await this.generalComponentsService.sendErrorMessage(
+          [`🛑 **Error:**`, `Oops, something went wrong, try again.`],
+          interaction,
+        )
+      }
+
+      return
+    }
+
+    return userCharacterData
+  }
 
   async createPanel(interaction: ModalSubmitInteraction, name: string) {
     if (name.length > 25) {
@@ -126,7 +151,11 @@ export class CharacterAddService {
 
     if (!user) {
       await this.generalComponentsService.sendErrorMessage(
-        ['Oops, something want wrong...', 'Write to Admin pleeease >.<'],
+        [
+          'Oops, something want wrong...',
+          'You were not found in the database',
+          'Write to Admin pleeease >.<',
+        ],
         interaction,
       )
 
@@ -174,9 +203,12 @@ export class CharacterAddService {
       interaction.customId.toLocaleLowerCase().includes(element.toLocaleLowerCase()),
     )
 
-    const userData = await this.redisService.getCache<UserCharacterAddT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_ADD + interaction.user.id,
-    )
+    const userData = await this.getCharacterCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!userData) return
 
     if (userData.elements.includes(element)) {
       userData.elements = userData.elements.filter(e => e !== element)
@@ -192,9 +224,11 @@ export class CharacterAddService {
   async handleSelectMenu(interaction: StringSelectMenuInteraction) {
     if (!interaction.isStringSelectMenu()) return
 
-    const userData = await this.redisService.getCache<UserCharacterAddT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_ADD + interaction.user.id,
-    )
+    const userData = await this.getCharacterCacheData({
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!userData) return
 
     if (
       interaction.customId ===
@@ -220,13 +254,12 @@ export class CharacterAddService {
     interaction: ButtonInteraction,
     charListChannel: TextChannel,
   ) {
-    const userData = await this.redisService.getCache<UserCharacterAddT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_ADD + interaction.user.id,
-    )
+    const userData = await this.getCharacterCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
 
-    if (!userData) {
-      await interaction.deleteReply()
-    }
+    if (!userData) return
 
     const elementsText =
       userData.elements
@@ -297,29 +330,12 @@ export class CharacterAddService {
       relations: ['characters'],
     })
 
-    const embed = new EmbedBuilder().setColor(0xdbc907).addFields(
-      {
-        name: '',
-        value: `<@${interaction.user.id}>`,
-      },
-      ...updatedCharList.characters.map(char => {
-        const elementsText =
-          char.elements
-            .map(element => `<:${element}:${elementEmojiMap[element]}>`)
-            .join('') || ''
+    const { embeds } = this.charListComponentsService.mutateCharList({
+      charList: updatedCharList.characters,
+      userDiscordId: interaction.user.id,
+    })
 
-        const classText = char.class
-          ? `<:${char.class}:${classesEmojiMap[char.class]}>`
-          : ''
-
-        return {
-          name: '',
-          value: `${classText} **${char.name}** ${elementsText}`,
-        }
-      }),
-    )
-
-    await charListDiscordMessage.edit({ embeds: [embed], content: '' })
+    await charListDiscordMessage.edit({ embeds, content: '' })
 
     const linkButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()

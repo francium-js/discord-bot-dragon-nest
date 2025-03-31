@@ -6,7 +6,6 @@ import {
   ButtonInteraction,
   ButtonStyle,
   EmbedBuilder,
-  Interaction,
   MessageFlags,
   ModalBuilder,
   ModalSubmitInteraction,
@@ -32,9 +31,11 @@ import { RedisCacheDuration } from 'src/shared/enums/redis-cache-duration'
 import { RedisCacheKey } from 'src/shared/enums/redis-cache-key'
 import { charInfoToString } from 'src/shared/helpers/char-info-to-string'
 import { RedisService } from 'src/shared/redis/redis.service'
-import GeneralComponentsService from 'src/shared/services/general-components.service'
+import { CharListComponentsService } from 'src/shared/services/char-list-components/char-list-components.service'
+import { GeneralComponentsService } from 'src/shared/services/general-components/general-components.service'
 import { UserCharacterEditT } from 'src/shared/types/user-character-edit'
 import { Repository } from 'typeorm'
+import { GetCharacterCacheDataT } from './types'
 
 @Injectable()
 export class CharacterEditService {
@@ -49,7 +50,30 @@ export class CharacterEditService {
     private readonly characterRepository: Repository<CharacterEntity>,
     private readonly redisService: RedisService,
     private readonly generalComponentsService: GeneralComponentsService,
+    private readonly charListComponentsService: CharListComponentsService,
   ) {}
+
+  async getCharacterCacheData({
+    interaction,
+    userDiscordId,
+  }: GetCharacterCacheDataT): Promise<UserCharacterEditT> {
+    const userCharacterData = await this.redisService.getCache<UserCharacterEditT>(
+      RedisCacheKey.USER_PANEL_CHARACTER_EDIT + userDiscordId,
+    )
+
+    if (!userCharacterData) {
+      if (interaction) {
+        await this.generalComponentsService.sendErrorMessage(
+          [`🛑 **Error:**`, `Oops, something went wrong, try again.`],
+          interaction,
+        )
+      }
+
+      return
+    }
+
+    return userCharacterData
+  }
 
   async createPanel(interaction: ButtonInteraction) {
     const userCharList = await this.charListRepository.findOne({
@@ -82,18 +106,18 @@ export class CharacterEditService {
   }
 
   async mutateInteraction(
-    userData: UserCharacterEditT,
+    userCharData: UserCharacterEditT,
     userCharListProps?: CharListEntity,
   ) {
     const userCharList =
       userCharListProps ??
       (await this.charListRepository.findOne({
-        where: { user: { discordId: userData.userDiscordId } },
+        where: { user: { discordId: userCharData.userDiscordId } },
         relations: ['characters'],
       }))
 
     const selectedCharForEdit = userCharList.characters.find(
-      char => char.id === userData.selectedCharId,
+      char => char.id === userCharData.selectedCharId,
     )
 
     let nickNameLabelBefore = ''
@@ -103,12 +127,12 @@ export class CharacterEditService {
 
     if (selectedCharForEdit) {
       nickNameLabelBefore = charInfoToString(selectedCharForEdit)
-      nickNameLabelAfter = charInfoToString(userData)
+      nickNameLabelAfter = charInfoToString(userCharData)
 
       fields = [
         {
           name: '',
-          value: userData.name
+          value: userCharData.name
             ? `Before: ${nickNameLabelBefore}`
             : 'Select character what you wanna edit',
         },
@@ -120,16 +144,16 @@ export class CharacterEditService {
     }
 
     await this.redisService.setCache({
-      key: RedisCacheKey.USER_PANEL_CHARACTER_EDIT + userData.userDiscordId,
-      value: userData,
+      key: RedisCacheKey.USER_PANEL_CHARACTER_EDIT + userCharData.userDiscordId,
+      value: userCharData,
       ttl: RedisCacheDuration.USER_PANEL_CHARACTER_EDIT,
     })
 
     const isRenderComponentsForEditChar = () => {
-      if (!userData.selectedCharId)
+      if (!userCharData.selectedCharId)
         return [
           this.createNicknameSelectMenus(
-            userData.selectedCharId,
+            userCharData.selectedCharId,
             userCharList.characters,
           ),
         ]
@@ -137,11 +161,11 @@ export class CharacterEditService {
       return [
         this.generalComponentsService.createElementButtons(
           PanelEnum.EDIT_CHAR,
-          userData.elements,
+          userCharData.elements,
         ),
         ...this.generalComponentsService.createClassSelectMenus(
-          userData.class,
-          userData.generalClass,
+          userCharData.class,
+          userCharData.generalClass,
           PanelEnum.EDIT_CHAR,
         ),
         new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -156,8 +180,8 @@ export class CharacterEditService {
             .setLabel('Submit ' + selectedCharForEdit.name)
             .setDisabled(
               Boolean(
-                !userData.class ||
-                  !userData.selectedCharId ||
+                !userCharData.class ||
+                  !userCharData.selectedCharId ||
                   nickNameLabelBefore === nickNameLabelAfter,
               ),
             )
@@ -183,6 +207,13 @@ export class CharacterEditService {
   }
 
   async openModalInputNickNameForEditUserCharacter(interaction: ButtonInteraction) {
+    const userCharData = await this.getCharacterCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!userCharData) return
+
     const modal = new ModalBuilder()
       .setCustomId(ComponentCustomIdEnum.MODAL_INPUT_NICKNAME_FOR_EDIT)
       .setTitle('Input nickname of you character')
@@ -201,16 +232,19 @@ export class CharacterEditService {
   }
 
   async editCharacterNameSubmited(interaction: ModalSubmitInteraction) {
-    const userData = await this.redisService.getCache<UserCharacterEditT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_EDIT + interaction.user.id,
-    )
+    const userCharData = await this.getCharacterCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!userCharData) return
 
     const name = interaction.fields.getTextInputValue(
       ComponentCustomIdEnum.INPUT_NICKNAME_FOR_EDIT,
     )
 
     if (name) {
-      userData.name = name
+      userCharData.name = name
     }
 
     if (name.length > 25) {
@@ -225,7 +259,7 @@ export class CharacterEditService {
     try {
       await interaction.deferUpdate()
 
-      const payLoad = await this.mutateInteraction(userData)
+      const payLoad = await this.mutateInteraction(userCharData)
 
       await interaction.editReply(payLoad)
     } catch (error) {
@@ -255,9 +289,11 @@ export class CharacterEditService {
   async handleSelectMenu(interaction: StringSelectMenuInteraction) {
     if (!interaction.isStringSelectMenu()) return
 
-    const userData = await this.redisService.getCache<UserCharacterEditT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_EDIT + interaction.user.id,
-    )
+    const userCharData = await this.getCharacterCacheData({
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!userCharData) return
 
     if (interaction.customId === ComponentCustomIdEnum.SELECT_CHARACTER_FOR_EDIT) {
       const userCharter = await this.characterRepository.findOne({
@@ -267,51 +303,52 @@ export class CharacterEditService {
         },
       })
 
-      userData.class = userCharter.class
-      userData.generalClass = userCharter.generalClass
-      userData.name = userCharter.name
-      userData.elements = userCharter.elements
-      userData.selectedCharId = userCharter.id
+      userCharData.class = userCharter.class
+      userCharData.generalClass = userCharter.generalClass
+      userCharData.name = userCharter.name
+      userCharData.elements = userCharter.elements
+      userCharData.selectedCharId = userCharter.id
     }
 
     if (
       interaction.customId ===
       PanelEnum.EDIT_CHAR + ComponentCustomIdEnum.SELECT_GENERAL_CLASS
     ) {
-      userData.generalClass = interaction.values[0] as GeneralCharacterClassEnum
-      userData.class = '' as CharacterClassEnum
+      userCharData.generalClass = interaction.values[0] as GeneralCharacterClassEnum
+      userCharData.class = '' as CharacterClassEnum
     }
 
     if (
       interaction.customId ===
       PanelEnum.EDIT_CHAR + ComponentCustomIdEnum.SELECT_CLASS
     ) {
-      userData.class = interaction.values[0] as CharacterClassEnum
+      userCharData.class = interaction.values[0] as CharacterClassEnum
     }
 
-    const payLoad = await this.mutateInteraction(userData)
+    const payLoad = await this.mutateInteraction(userCharData)
 
     await interaction.update(payLoad)
   }
 
-  async handleElementSelection(interaction: Interaction) {
-    if (!interaction.isButton()) return
+  async handleElementSelection(interaction: ButtonInteraction) {
+    const userCharData = await this.getCharacterCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
+
+    if (!userCharData) return
 
     const element = Object.values(ElementEnum).find(element =>
       interaction.customId.toLocaleLowerCase().includes(element.toLocaleLowerCase()),
     )
 
-    const userData = await this.redisService.getCache<UserCharacterEditT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_EDIT + interaction.user.id,
-    )
-
-    if (userData.elements.includes(element)) {
-      userData.elements = userData.elements.filter(e => e !== element)
+    if (userCharData.elements.includes(element)) {
+      userCharData.elements = userCharData.elements.filter(e => e !== element)
     } else {
-      userData.elements.push(element)
+      userCharData.elements.push(element)
     }
 
-    const payLoad = await this.mutateInteraction(userData)
+    const payLoad = await this.mutateInteraction(userCharData)
 
     await interaction.update(payLoad)
   }
@@ -320,16 +357,15 @@ export class CharacterEditService {
     interaction: ButtonInteraction,
     charListChannel: TextChannel,
   ) {
-    const userData = await this.redisService.getCache<UserCharacterEditT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_EDIT + interaction.user.id,
-    )
+    const userCharData = await this.getCharacterCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
 
-    if (!userData) {
-      await interaction.deleteReply()
-    }
+    if (!userCharData) return
 
-    const nickNameLable = charInfoToString(userData)
-    const { selectedCharId, userDiscordId, ...rest } = userData
+    const nickNameLable = charInfoToString(userCharData)
+    const { selectedCharId, userDiscordId, ...rest } = userCharData
 
     const user = await this.userRepository.findOne({
       where: { discordId: userDiscordId },
@@ -414,16 +450,15 @@ export class CharacterEditService {
     interaction: ButtonInteraction,
     charListChannel: TextChannel,
   ) {
-    const userData = await this.redisService.getCache<UserCharacterEditT>(
-      RedisCacheKey.USER_PANEL_CHARACTER_EDIT + interaction.user.id,
-    )
+    const userCharData = await this.getCharacterCacheData({
+      interaction,
+      userDiscordId: interaction.user.id,
+    })
 
-    if (!userData) {
-      await interaction.deleteReply()
-    }
+    if (!userCharData) return
 
-    const nickNameLable = charInfoToString(userData)
-    const { selectedCharId, userDiscordId } = userData
+    const nickNameLable = charInfoToString(userCharData)
+    const { selectedCharId, userDiscordId } = userCharData
 
     const user = await this.userRepository.findOne({
       where: { discordId: userDiscordId },
@@ -446,37 +481,12 @@ export class CharacterEditService {
       relations: ['characters'],
     })
 
-    const characterFields = () => {
-      if (!updatedCharList?.characters?.length) {
-        return [{ name: '', value: '🛑 The player has not added any characters' }]
-      }
+    const { embeds } = this.charListComponentsService.mutateCharList({
+      charList: updatedCharList.characters,
+      userDiscordId: interaction.user.id,
+    })
 
-      return updatedCharList.characters.map(char => {
-        const elementsText =
-          char.elements
-            .map(element => `<:${element}:${elementEmojiMap[element]}>`)
-            .join('') || ''
-
-        const classText = char.class
-          ? `<:${char.class}:${classesEmojiMap[char.class]}>`
-          : ''
-
-        return {
-          name: '',
-          value: `${classText} **${char.name}** ${elementsText}`,
-        }
-      })
-    }
-
-    const embed = new EmbedBuilder().setColor(0xdbc907).addFields(
-      {
-        name: '',
-        value: `<@${interaction.user.id}>`,
-      },
-      ...characterFields(),
-    )
-
-    await charListDiscordMessage.edit({ embeds: [embed], content: '' })
+    await charListDiscordMessage.edit({ embeds, content: '' })
 
     const linkButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()

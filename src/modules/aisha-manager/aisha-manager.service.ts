@@ -17,9 +17,8 @@ import { CharacterEditService } from './services/character-edit/character-edit.s
 @Injectable()
 class AishaManagerPanelService {
   private charListDiscordChalledId: string = process.env.CHARS_LIST_CHANNEL_ID
-
+  private panelChannelId: string = process.env.CHARS_MANAGER_CHANNEL_ID
   private client: Client
-  private panelChannelId: string
 
   constructor(
     private readonly charactersListService: CharactersListService,
@@ -34,14 +33,10 @@ class AishaManagerPanelService {
         GatewayIntentBits.GuildMembers,
       ],
     })
-
-    this.panelChannelId = process.env.CHARS_MANAGER_CHANNEL_ID
   }
 
   async onModuleInit() {
-    const token = process.env.AISHA_DISCORD_TOKEN
-
-    await this.client.login(token)
+    await this.client.login(process.env.AISHA_DISCORD_TOKEN)
 
     this.client.on(Events.InteractionCreate, async interaction => {
       if (

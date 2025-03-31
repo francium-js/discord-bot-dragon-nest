@@ -13,15 +13,41 @@ import {
 import { classesEmojiMap, elementEmojiMap } from 'src/shared/constants/emoji-ids'
 import { ComponentCustomIdEnum } from 'src/shared/enums/component-custom-id'
 import { ElementEnum } from 'src/shared/enums/element'
-import { CharacterClassEnum } from '../enums/character-class'
-import { GeneralCharacterClassEnum } from '../enums/general-character-class'
-import { classesMap } from '../constants/classes-map'
-import { PanelEnum } from '../enums/panel'
+import { CharacterClassEnum } from '../../enums/character-class'
+import { GeneralCharacterClassEnum } from '../../enums/general-character-class'
+import { classesMap } from '../../constants/classes-map'
+import { PanelEnum } from '../../enums/panel'
 
-Injectable()
+@Injectable()
+export class GeneralComponentsService {
+  addEmptyFields(embed: EmbedBuilder) {
+    embed.addFields([
+      {
+        name: '',
+        value: ``,
+      },
+    ])
+  }
 
-class GeneralComponentsService {
-  constructor() {}
+  async updateMessageToErrorMessage(
+    errors: string[],
+    interaction: ButtonInteraction,
+  ) {
+    const updatedEmbed = new EmbedBuilder().setColor(0xf50909).addFields(
+      errors.map(e => {
+        return {
+          name: '',
+          value: e,
+        }
+      }),
+    )
+
+    await interaction.update({
+      embeds: [updatedEmbed],
+      content: '',
+      components: [],
+    })
+  }
 
   async sendErrorMessage(
     errors: string[],
@@ -117,5 +143,3 @@ class GeneralComponentsService {
     return component
   }
 }
-
-export default GeneralComponentsService

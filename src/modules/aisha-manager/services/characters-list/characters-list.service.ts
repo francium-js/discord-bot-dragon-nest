@@ -8,7 +8,7 @@ import {
   MessageFlags,
 } from 'discord.js'
 import { CharListEntity } from 'src/entities/char-list.entity'
-import GeneralComponentsService from 'src/shared/services/general-components.service'
+import { GeneralComponentsService } from 'src/shared/services/general-components/general-components.service'
 import { Repository } from 'typeorm'
 
 @Injectable()

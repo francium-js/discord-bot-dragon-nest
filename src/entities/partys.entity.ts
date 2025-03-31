@@ -8,26 +8,27 @@ import {
 import { UserEntity } from './user.entity'
 import { ElementEnum } from '../shared/enums/element'
 import { ServerRegionEnum } from '../shared/enums/server-region'
+import { CharacterEntity } from './character.entity'
 
 @Entity({ name: 'partys' })
 export class PartyEntity {
   @PrimaryGeneratedColumn()
   id: number
 
-  @ManyToOne(() => UserEntity, user => user.createdPartys, {
-    nullable: false,
-    onDelete: 'CASCADE',
-  })
-  createdBy: UserEntity
+  @Column({ type: 'varchar', unique: true, nullable: false })
+  discordMessageId: string
 
-  @ManyToOne(() => UserEntity, {
+  @Column({ type: 'varchar', unique: true, nullable: false })
+  partyCategoryId: string
+
+  @ManyToOne(() => UserEntity, user => user.partys, {
     nullable: false,
     onDelete: 'CASCADE',
   })
   leader: UserEntity
 
-  @OneToMany(() => UserEntity, user => user.joinedParty, { nullable: true })
-  members: UserEntity[]
+  @OneToMany(() => CharacterEntity, user => user.joinedParty, { nullable: true })
+  members: CharacterEntity[]
 
   @Column({
     type: 'enum',
@@ -61,4 +62,7 @@ export class PartyEntity {
     nullable: true,
   })
   serverRegion: ServerRegionEnum
+
+  @Column({ type: 'varchar', nullable: true })
+  description: string
 }

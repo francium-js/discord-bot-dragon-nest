@@ -15,7 +15,7 @@ import { PanelEnum } from 'src/shared/enums/panel'
 @Injectable()
 export class RubinartManagerService implements OnModuleInit {
   private client: Client
-  private panelChannelId: string
+  private panelChannelId: string = process.env.PARTY_MANAGER_CHANNEL_ID
 
   constructor(private createPartyPanelService: CreatePartyPanelService) {
     this.client = new Client({
@@ -26,8 +26,6 @@ export class RubinartManagerService implements OnModuleInit {
         GatewayIntentBits.GuildMembers,
       ],
     })
-
-    this.panelChannelId = process.env.PARTY_MANAGER_CHANNEL_ID
   }
 
   async onModuleInit() {
@@ -54,6 +52,12 @@ export class RubinartManagerService implements OnModuleInit {
         if (modalInteraction.customId === ComponentCustomIdEnum.SET_UTC_MODAL) {
           await this.createPartyPanelService.handleUserUTC(modalInteraction)
         }
+
+        if (
+          modalInteraction.customId === ComponentCustomIdEnum.PARTY_DESCRIPTION_MODAL
+        ) {
+          await this.createPartyPanelService.handlePartyDescription(modalInteraction)
+        }
       }
 
       if (interaction.isButton()) {
@@ -73,7 +77,11 @@ export class RubinartManagerService implements OnModuleInit {
             break
 
           case ComponentCustomIdEnum.OPEN_MODAL_SET_TIME:
-            await this.createPartyPanelService.handleTimeButton(interaction)
+            await this.createPartyPanelService.openModalTimeSet(interaction)
+            break
+
+          case ComponentCustomIdEnum.OPEN_MODAL_PARTY_DESCRIPTION:
+            await this.createPartyPanelService.openModalSetDescription(interaction)
             break
 
           case ComponentCustomIdEnum.OPEN_MODAL_INPUT_UTC_FOR_CREATE_PARTY:
@@ -93,7 +101,10 @@ export class RubinartManagerService implements OnModuleInit {
             break
 
           case ComponentCustomIdEnum.SUBMIT_CREATE_PARTY:
-            await this.createPartyPanelService.handleCreateParty(interaction)
+            await this.createPartyPanelService.handleCreateParty({
+              interaction,
+              client: this.client,
+            })
             break
         }
       }

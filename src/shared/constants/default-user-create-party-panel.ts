@@ -2,8 +2,8 @@ import { UserCreatePartyPanelT } from 'src/shared/types/user-create-party-panel'
 
 export const defaultUserCreatePartyPanel: UserCreatePartyPanelT = {
   elements: [],
-  server: '',
-  nest: '',
+  serverRegion: null!,
+  nest: null!,
   timeStart: '',
   timeEnd: '',
   classPriorityLoot: false,
@@ -11,4 +11,5 @@ export const defaultUserCreatePartyPanel: UserCreatePartyPanelT = {
   selectedCharId: null!,
   characters: [],
   isSecontStageOfCreateParty: false,
+  description: '',
 }
