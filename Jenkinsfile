@@ -20,13 +20,13 @@ pipeline {
       }
     }
 
-    stage('Deploy (optional)') {
+    stage('Deploy start') {
       steps {
         echo 'Hello'
       }
     }
 
-    stage('Deploy (optional)') {
+    stage('Deploy end') {
       steps {
         echo 'Bye bye'
       }
