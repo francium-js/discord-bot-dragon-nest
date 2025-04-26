@@ -26,6 +26,12 @@ pipeline {
       }
     }
 
+    stage('Deploy middle') {
+      steps {
+        echo 'Lmao'
+      }
+    }
+
     stage('Deploy end') {
       steps {
         echo 'Bye bye'
