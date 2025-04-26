@@ -10,13 +10,13 @@ pipeline {
 
     stage('Install dependencies') {
       steps {
-        sh 'yarn install'
+        yarn 'install'
       }
     }
 
     stage('Build project') {
       steps {
-        sh 'yarn build'
+        yarn 'build'
       }
     }
 
